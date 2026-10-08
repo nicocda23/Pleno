@@ -84,10 +84,10 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 
 ### Fase 0 — Setup (2 a 3 días)
 
-- [ ] Repo con rama dev como base, protección de main y convención de commits (falta proteger main en GitHub)
+- [x] Repo con rama dev como base, protección de main y convención de commits
 - [x] Solución .NET 10 con AppHost de Aspire y ServiceDefaults
 - [x] Postgres, Redis y RabbitMQ levantados desde Aspire
-- [ ] CI: build, tests y análisis estático en cada PR (workflow creado; falta su primera corrida en GitHub)
+- [x] CI: build, tests y análisis estático en cada PR
 - [x] Proyecto de tests de integración con Testcontainers
 - [x] CLAUDE.md con convenciones del proyecto para trabajar con Claude Code
 - [x] Carpeta docs/adr con la primera decisión: monolito modular primero
