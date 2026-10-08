@@ -1,14 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useRound, usePlaceBet, useRounds } from "../api/hooks";
 import type { PlaceBetBody, Round, RoundClosedNotice } from "../api/types";
+import { Board } from "../components/Board";
 import { Pocket } from "../components/Pocket";
 import { useToasts } from "../components/Toasts";
+import { WheelCanvas } from "../components/WheelCanvas";
+import { type PlacedChips, type Spot } from "../lib/board";
 import { formatChips } from "../lib/format";
 import { errorMessage, failureMessage } from "../lib/messages";
-import { OUTSIDE_BETS, pocketColor, straightBet, type BetOption } from "../lib/roulette";
+import { pocketColor } from "../lib/roulette";
+import { useWheelClock } from "../lib/useWheelClock";
+import { WheelModel } from "../lib/wheel";
 import { useRealtime } from "../realtime/RealtimeProvider";
 
-const STAKES = [10, 50, 100, 500];
+const CHIPS = [1, 10, 50, 100, 500];
+
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Lo que se muestra al terminar una apuesta, venga del aviso en vivo o de la consulta de respaldo. */
 interface Result {
@@ -31,29 +39,41 @@ const fromRound = (r: Round): Result => ({
 });
 
 export function Roulette() {
-  const { balance, onRoundClosed } = useRealtime();
+  const { balance, onRoundClosed, holdBalance } = useRealtime();
   const toasts = useToasts();
   const placeBet = usePlaceBet();
   const recent = useRounds(10);
 
-  const [bet, setBet] = useState<BetOption>(OUTSIDE_BETS[0]!);
-  const [straight, setStraight] = useState("17");
-  const [stake, setStake] = useState(10);
+  const [model] = useState(() => new WheelModel({ reduceMotion: prefersReducedMotion() }));
+  const [chip, setChip] = useState(10);
+  const [placed, setPlaced] = useState<PlacedChips | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
+  const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Misma apuesta = misma clave de idempotencia: si la respuesta se pierde y el jugador reintenta, el servidor no cobra dos veces.
   const pending = useRef<{ fingerprint: string; key: string } | null>(null);
+  // Resultado que el cliente ya conoce pero que se muestra recien cuando la bola se detiene.
+  const closedRef = useRef<Result | null>(null);
+  const landedRef = useRef(false); // ya se le dijo a la rueda en que numero cae
+  const ballDoneRef = useRef(false); // la bola ya se detuvo
+  const releaseRef = useRef<(() => void) | null>(null);
 
-  const straightNumber = Number(straight);
-  const straightValid = Number.isInteger(straightNumber) && straightNumber >= 0 && straightNumber <= 36;
-  const selected: BetOption | null = bet.id === "straight" ? (straightValid ? straightBet(straightNumber) : null) : bet;
-  const canBet = selected !== null && stake >= 1 && stake <= balance.available && waitingFor === null && !placeBet.isPending;
+  const release = () => {
+    releaseRef.current?.();
+    releaseRef.current = null;
+  };
+  useEffect(() => release, []);
 
-  const finish = (closed: Result) => {
-    setResult((current) => (current?.betId === closed.betId ? current : closed));
-    setWaitingFor((current) => (current === closed.betId ? null : current));
+  const stake = placed?.stake ?? 0;
+  const canBet = placed !== null && stake >= 1 && stake <= balance.available && !spinning && !placeBet.isPending;
+
+  const reveal = (closed: Result) => {
+    setResult(closed);
+    setSpinning(false);
+    setWaitingFor(null);
+    release(); // recien ahora el saldo se actualiza
     if (closed.status === "Settled") {
       toasts.show(closed.payout > 0 ? "win" : "loss", closed.payout > 0 ? `Salió el ${closed.winningNumber}. Ganaste ${formatChips(closed.payout)} fichas.` : `Salió el ${closed.winningNumber}.`);
     } else if (closed.status === "Rejected") {
@@ -62,43 +82,97 @@ export function Roulette() {
       toasts.show("info", "La ronda se anuló y tus fichas volvieron a tu saldo.");
     }
   };
-  const finishRef = useRef(finish);
+
+  /** El resultado se muestra cuando la bola ya se detuvo Y la ronda ya esta cobrada (lo que llegue ultimo). */
+  const tryReveal = () => {
+    const closed = closedRef.current;
+    if (!closed || !ballDoneRef.current) return;
+    closedRef.current = null;
+    reveal(closed);
+  };
+
+  const phase = useWheelClock(model, () => {
+    ballDoneRef.current = true;
+    tryReveal();
+  });
+
+  /** El servidor ya sorteo el numero (aunque todavia falte cobrar): la bola puede empezar a aterrizar. */
+  const onDrawn = (round: Round) => {
+    if (round.betId !== waitingFor || landedRef.current || round.winningNumber === null) return;
+    landedRef.current = true;
+    model.land(round.winningNumber);
+  };
+
+  /** La ronda termino. Si hubo numero la bola aterriza en el; si no, no hay nada que animar. */
+  const onClosed = (closed: Result) => {
+    if (closedRef.current || closed.betId !== waitingFor) return;
+    if (closed.status === "Settled" && closed.winningNumber !== null) {
+      closedRef.current = closed;
+      if (!landedRef.current) {
+        landedRef.current = true;
+        model.land(closed.winningNumber);
+      }
+      tryReveal();
+    } else {
+      model.cancel();
+      reveal(closed);
+    }
+  };
+  const onClosedRef = useRef(onClosed);
+  const onDrawnRef = useRef(onDrawn);
   useEffect(() => {
-    finishRef.current = finish;
+    onClosedRef.current = onClosed;
+    onDrawnRef.current = onDrawn;
   });
 
   // Aviso en vivo.
-  useEffect(() => onRoundClosed((notice) => {
-    if (notice.betId === waitingFor) finishRef.current(fromNotice(notice));
-  }), [onRoundClosed, waitingFor]);
+  useEffect(() => onRoundClosed((notice) => onClosedRef.current(fromNotice(notice))), [onRoundClosed]);
 
   // Respaldo: si el aviso se perdio, la consulta periodica cierra igual la ronda.
   const polled = useRound(waitingFor);
   useEffect(() => {
     const round = polled.data;
-    if (round && waitingFor === round.betId && ["Settled", "Rejected", "Voided"].includes(round.status)) {
-      finishRef.current(fromRound(round));
-    }
-  }, [polled.data, waitingFor]);
+    if (!round) return;
+    if (["Settled", "Rejected", "Voided"].includes(round.status)) onClosedRef.current(fromRound(round));
+    else onDrawnRef.current(round);
+  }, [polled.data]);
+
+  const pick = (spot: Spot) => {
+    setError(null);
+    setPlaced((current) => (current?.spot.id === spot.id ? { spot, stake: current.stake + chip } : { spot, stake: chip }));
+  };
 
   const submit = async () => {
-    if (!selected) return;
+    if (!placed) return;
     setError(null);
-    const body: PlaceBetBody = { betType: selected.betType, selection: selected.selection, stake };
+    const body: PlaceBetBody = { betType: placed.spot.betType, selection: placed.spot.selection, stake: placed.stake };
     const fingerprint = JSON.stringify(body);
     if (pending.current?.fingerprint !== fingerprint) pending.current = { fingerprint, key: crypto.randomUUID() };
 
+    // La rueda empieza a girar ya, sin conocer el resultado, y el saldo se congela hasta que la bola caiga.
+    setResult(null);
+    setSpinning(true);
+    closedRef.current = null;
+    landedRef.current = false;
+    ballDoneRef.current = false;
+    releaseRef.current = holdBalance();
+    model.spin();
+
     try {
-      const placed = await placeBet.mutateAsync({ body, idempotencyKey: pending.current.key });
+      const accepted = await placeBet.mutateAsync({ body, idempotencyKey: pending.current.key });
       pending.current = null; // aceptada: la proxima apuesta usa otra clave
-      setResult(null);
-      setWaitingFor(placed.betId);
+      setWaitingFor(accepted.betId);
     } catch (e) {
+      model.cancel();
+      setSpinning(false);
+      release();
       setError(errorMessage(e));
       // Error definitivo (la API lo rechazo): proxima apuesta con clave nueva. Si fue de red, se conserva para reintentar sin duplicar.
       if (e instanceof Error && "status" in e && (e as { status: number }).status !== 0) pending.current = null;
     }
   };
+
+  const wheelLabel = phase === "settled" && model.result !== null ? `La bola se detuvo en el ${model.result}` : phase === "idle" ? "Ruleta en reposo" : "La ruleta está girando";
 
   return (
     <div className="stack">
@@ -110,81 +184,46 @@ export function Roulette() {
 
       <div className="table-grid">
         <section className="card" aria-labelledby="apuesta">
-          <h2 id="apuesta" className="section-title">1. Elegí tu apuesta</h2>
-          <div className="chips" role="radiogroup" aria-label="Tipo de apuesta">
-            {OUTSIDE_BETS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                role="radio"
-                aria-checked={bet.id === option.id}
-                className={`choice ${bet.id === option.id ? "choice--on" : ""}`}
-                onClick={() => setBet(option)}
-              >
-                <span>{option.label}</span>
-                <small>paga x{option.multiplier}</small>
-              </button>
-            ))}
-            <button
-              type="button"
-              role="radio"
-              aria-checked={bet.id === "straight"}
-              className={`choice ${bet.id === "straight" ? "choice--on" : ""}`}
-              onClick={() => setBet({ ...straightBet(0), id: "straight" })}
-            >
-              <span>Pleno</span>
-              <small>paga x36</small>
-            </button>
-          </div>
-
-          {bet.id === "straight" && (
-            <label className="field">
-              <span>Número (0 a 36)</span>
-              <input type="number" inputMode="numeric" min={0} max={36} value={straight} onChange={(e) => setStraight(e.target.value)} aria-invalid={!straightValid} />
-            </label>
-          )}
-
-          <h2 className="section-title">2. Cuántas fichas</h2>
-          <div className="chips" role="radiogroup" aria-label="Fichas a apostar">
-            {STAKES.map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={stake === value} className={`choice choice--stake ${stake === value ? "choice--on" : ""}`} onClick={() => setStake(value)}>
+          <h2 id="apuesta" className="section-title">1. Elegí una ficha y tocá el tapete</h2>
+          <div className="chips" role="radiogroup" aria-label="Valor de la ficha">
+            {CHIPS.map((value) => (
+              <button key={value} type="button" role="radio" aria-checked={chip === value} className={`choice choice--stake ${chip === value ? "choice--on" : ""}`} onClick={() => setChip(value)}>
                 {formatChips(value)}
               </button>
             ))}
           </div>
-          <label className="field">
-            <span>Otro monto</span>
-            <input type="number" inputMode="numeric" min={1} step={1} value={stake} onChange={(e) => setStake(Math.max(0, Math.trunc(Number(e.target.value))))} />
-          </label>
+
+          <Board placed={placed} disabled={spinning} winning={result?.status === "Settled" ? result.winningNumber : null} onPick={pick} />
 
           <div className="summary">
-            {selected ? (
+            {placed ? (
               <span>
-                {selected.label}: si ganás, cobrás <strong>{formatChips(stake * selected.multiplier)}</strong> fichas (incluye tu apuesta).
+                {placed.spot.label}: si ganás, cobrás <strong>{formatChips(placed.stake * placed.spot.multiplier)}</strong> fichas (incluye tu apuesta). Tocá de nuevo el mismo lugar para sumar fichas.
               </span>
             ) : (
-              <span className="muted">Elegí un número válido.</span>
+              <span className="muted">Tocá un número o una apuesta del tapete.</span>
             )}
           </div>
 
           {stake > balance.available && balance.ready && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa apuesta.</p>}
           {error && <p className="notice notice--error" role="alert">{error}</p>}
 
-          <button type="button" className="btn btn--gold btn--lg btn--block" disabled={!canBet} onClick={() => void submit()}>
-            {waitingFor ? "Girando…" : placeBet.isPending ? "Enviando…" : `Apostar ${formatChips(stake)} fichas`}
-          </button>
+          <div className="actions">
+            <button type="button" className="btn btn--ghost" disabled={!placed || spinning} onClick={() => setPlaced(null)}>
+              Quitar fichas
+            </button>
+            <button type="button" className="btn btn--gold btn--lg" disabled={!canBet} onClick={() => void submit()}>
+              {spinning ? "Girando…" : placeBet.isPending ? "Enviando…" : placed ? `Apostar ${formatChips(stake)} fichas` : "Apostar"}
+            </button>
+          </div>
         </section>
 
         <section className="card result" aria-labelledby="resultado" aria-live="polite">
-          <h2 id="resultado" className="section-title">Resultado</h2>
-          {waitingFor && (
-            <div className="spinwheel" role="status">
-              <span className="spinwheel__ball" aria-hidden="true" />
-              <p>La ruleta está girando…</p>
-            </div>
-          )}
-          {!waitingFor && !result && <p className="muted">Tu próxima tirada aparece acá.</p>}
-          {!waitingFor && result && <ResultView result={result} />}
+          <h2 id="resultado" className="section-title">La ruleta</h2>
+          <WheelCanvas model={model} phase={phase} label={wheelLabel} />
+          {!spinning && !result && <p className="muted">Tu próxima tirada aparece acá.</p>}
+          {spinning && <p role="status">La ruleta está girando…</p>}
+          {!spinning && result && <ResultView result={result} />}
 
           <h3 className="section-subtitle">Últimos números</h3>
           <div className="strip">

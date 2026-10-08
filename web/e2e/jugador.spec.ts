@@ -34,13 +34,20 @@ test("un jugador entra, apuesta, ve el resultado en vivo y lo verifica", async (
   const before = await readBalance(page);
   expect(before).toBeGreaterThan(10);
 
-  // Ruleta: una apuesta al rojo.
+  // Ruleta: una apuesta al rojo, tocando el tapete.
   await page.getByRole("link", { name: "Ruleta" }).first().click();
-  await page.getByRole("radio", { name: /Rojo/ }).click();
   await page.getByRole("radio", { name: "10", exact: true }).click();
+  await page.getByRole("button", { name: "Rojo", exact: true }).click();
   await page.getByRole("button", { name: /Apostar 10 fichas/ }).click();
 
-  await expect(page.getByText(/Salió el \d+/).first()).toBeVisible({ timeout: 30_000 });
+  // La rueda gira y el saldo y el resultado NO se adelantan: se revelan recien cuando la bola cae.
+  const wheel = page.getByTestId("wheel");
+  await expect(wheel).toHaveAttribute("data-state", /spinning|landing/);
+  expect(await readBalance(page)).toBe(before);
+  await expect(page.getByText(/Salió el \d+/)).toHaveCount(0);
+
+  await expect(wheel).toHaveAttribute("data-state", "settled", { timeout: 30_000 });
+  await expect(page.getByText(/Salió el \d+/).first()).toBeVisible();
   const won = await page.getByText(/Ganaste/).count();
 
   // El saldo en vivo se movió sin recargar la página: -10 si perdió, +10 neto si gano (paga x2 e incluye la apuesta).
