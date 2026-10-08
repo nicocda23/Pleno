@@ -106,6 +106,17 @@ public sealed partial class RouletteService(
             ?? throw new GamesDomainException(GamesError.RoundNotFound, $"No existe la ronda {betId}.");
     }
 
+    /// <summary>Ultimas rondas de un jugador, de la mas reciente a la mas vieja.</summary>
+    public async Task<IReadOnlyList<RouletteRound>> GetHistoryAsync(Guid userId, int limit, CancellationToken ct = default)
+    {
+        await using var session = store.QuerySession();
+        return await session.Query<RouletteRound>()
+            .Where(round => round.UserId == userId)
+            .OrderByDescending(round => round.PlacedAt)
+            .Take(limit)
+            .ToListAsync(ct);
+    }
+
     /// <summary>La Wallet reservo las fichas: se sortea con el nonce ya asignado y se informa el resultado.</summary>
     public async Task OnStakeReservedAsync(StakeReserved message, CancellationToken ct = default)
     {

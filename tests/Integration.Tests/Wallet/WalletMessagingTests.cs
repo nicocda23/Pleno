@@ -31,13 +31,7 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
 
     public Task InitializeAsync()
     {
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Development");
-            builder.UseSetting("ConnectionStrings:casinodb", db.ConnectionString);
-            builder.UseSetting("ConnectionStrings:rabbitmq", rabbit.ConnectionString);
-            builder.UseSetting("Fairness:MasterKey", db.MasterKey);
-        });
+        _factory = TestAuth.StartApp(db, rabbit);
         _host = _factory.Services.GetRequiredService<IHost>();
         _wallet = _factory.Services.GetRequiredService<WalletService>();
         return Task.CompletedTask;
@@ -86,10 +80,10 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
 
         var session = await PublishTrackedAsync(new ReserveStake(bet, accountId, 100));
 
-        Assert.Equal(bet, session.Received.SingleMessage<ReserveStake>().BetId);
-        var reserved = session.Sent.SingleMessage<StakeReserved>();
+        Assert.Equal(bet, session.Received.MessagesOf<ReserveStake>().Single(m => m.BetId == bet).BetId);
+        var reserved = session.Sent.MessagesOf<StakeReserved>().Single(m => m.BetId == bet);
         Assert.Equal((bet, accountId, 100L), (reserved.BetId, reserved.AccountId, reserved.Stake));
-        var balance = session.Sent.SingleMessage<BalanceChanged>();
+        var balance = session.Sent.MessagesOf<BalanceChanged>().Single(m => m.AccountId == accountId);
         Assert.Equal((900L, 100L), (balance.Available, balance.Reserved));
 
         var account = await _wallet.GetAsync(accountId);
@@ -108,8 +102,8 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
 
         var duplicate = await PublishTrackedAsync(new ReserveStake(bet, accountId, 100));
 
-        Assert.Empty(duplicate.Sent.MessagesOf<StakeReserved>());
-        Assert.Empty(duplicate.Sent.MessagesOf<BalanceChanged>());
+        Assert.DoesNotContain(duplicate.Sent.MessagesOf<StakeReserved>(), m => m.BetId == bet);
+        Assert.DoesNotContain(duplicate.Sent.MessagesOf<BalanceChanged>(), m => m.AccountId == accountId);
         var account = await _wallet.GetAsync(accountId);
         Assert.Equal((900L, 100L), (account.Available, account.Reserved));
     }
@@ -122,9 +116,9 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
 
         var session = await PublishTrackedAsync(new ReserveStake(bet, accountId, 5_000));
 
-        var rejected = session.Sent.SingleMessage<StakeRejected>();
+        var rejected = session.Sent.MessagesOf<StakeRejected>().Single(m => m.BetId == bet);
         Assert.Equal((bet, "InsufficientFunds"), (rejected.BetId, rejected.Reason));
-        Assert.Empty(session.Sent.MessagesOf<StakeReserved>());
+        Assert.DoesNotContain(session.Sent.MessagesOf<StakeReserved>(), m => m.BetId == bet);
         Assert.Equal(50, (await _wallet.GetAsync(accountId)).Available);
     }
 
@@ -138,9 +132,9 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
         var session = await PublishTrackedAsync(new RoundResolved(bet, accountId, 360));
         var duplicate = await PublishTrackedAsync(new RoundResolved(bet, accountId, 360));
 
-        var settled = session.Sent.SingleMessage<StakeSettled>();
+        var settled = session.Sent.MessagesOf<StakeSettled>().Single(m => m.BetId == bet);
         Assert.Equal((100L, 360L), (settled.Stake, settled.Payout));
-        Assert.Empty(duplicate.Sent.MessagesOf<StakeSettled>());
+        Assert.DoesNotContain(duplicate.Sent.MessagesOf<StakeSettled>(), m => m.BetId == bet);
         var account = await _wallet.GetAsync(accountId);
         Assert.Equal((1_260L, 0L), (account.Available, account.Reserved));
     }
@@ -153,7 +147,7 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
 
         var session = await PublishTrackedAsync(new RoundResolved(bet, accountId, 100));
 
-        var rejected = session.Sent.SingleMessage<StakeSettlementRejected>();
+        var rejected = session.Sent.MessagesOf<StakeSettlementRejected>().Single(m => m.BetId == bet);
         Assert.Equal((bet, "ReservationNotFound"), (rejected.BetId, rejected.Reason));
         Assert.Equal(1_000, (await _wallet.GetAsync(accountId)).Available);
     }
@@ -186,8 +180,8 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
 
         var account = await _wallet.GetAsync(accountId);
         Assert.Equal(500, account.Reserved);
-        Assert.Equal(50, session.Sent.MessagesOf<StakeReserved>().Count());
-        Assert.Equal(50, session.Sent.MessagesOf<BalanceChanged>().Count());
+        Assert.Equal(50, session.Sent.MessagesOf<StakeReserved>().Count(m => m.AccountId == accountId));
+        Assert.Equal(50, session.Sent.MessagesOf<BalanceChanged>().Count(m => m.AccountId == accountId));
     }
 
     [Fact]

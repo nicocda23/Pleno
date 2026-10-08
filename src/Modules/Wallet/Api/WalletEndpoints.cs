@@ -1,3 +1,4 @@
+using Casino.BuildingBlocks;
 using Casino.Modules.Wallet.Application;
 using Casino.Modules.Wallet.Domain;
 using Microsoft.AspNetCore.Builder;
@@ -6,17 +7,7 @@ using Microsoft.AspNetCore.Routing;
 
 namespace Casino.Modules.Wallet.Api;
 
-public sealed record OpenAccountRequest(Guid UserId);
-
 public sealed record CreditRequest(long Amount);
-
-public sealed record ReserveRequest(Guid ReservationId, long Stake);
-
-public sealed record SettleRequest(Guid ReservationId, long Payout);
-
-public sealed record ReleaseRequest(Guid ReservationId);
-
-public sealed record ReverseRequest(Guid TransactionId);
 
 public sealed record OperationResponse(Guid TransactionId, bool IsDuplicate);
 
@@ -28,65 +19,65 @@ public sealed record AccountResponse(
     long Version,
     IReadOnlyDictionary<Guid, long> OpenReservations);
 
+// Reservar, liquidar y liberar NO son endpoints: son pasos internos de una apuesta que ocurren por mensajes.
+// Un jugador solo puede consultar SU cuenta; acreditar fichas a mano es cosa del backoffice.
 internal static class WalletEndpoints
 {
     private const string IdempotencyHeader = "Idempotency-Key";
 
     public static void Map(IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/wallet").WithTags("Wallet");
-        group.AddEndpointFilter(MapDomainErrors);
+        var player = app.MapGroup("/wallet").WithTags("Wallet");
+        player.RequireAuthorization(policy => policy.RequireRole(Roles.Player));
+        player.AddEndpointFilter(MapDomainErrors);
 
-        group.MapPost("/accounts", async (OpenAccountRequest request, WalletService wallet, CancellationToken ct) =>
+        // La cuenta se deriva del usuario autenticado: no hay forma de pedir la de otro.
+        player.MapGet("/me", (HttpContext http, WalletService wallet, CancellationToken ct) =>
+            GetAccountAsync(http.User.GetUserId(), wallet, ct));
+
+        player.MapGet("/me/balance", (HttpContext http, DateTimeOffset asOf, WalletService wallet, CancellationToken ct) =>
+            GetBalanceAsync(http.User.GetUserId(), asOf, wallet, ct));
+
+        var backoffice = app.MapGroup("/backoffice/wallet").WithTags("Backoffice");
+        backoffice.RequireAuthorization(policy => policy.RequireRole(Roles.Backoffice));
+        backoffice.AddEndpointFilter(MapDomainErrors);
+
+        backoffice.MapGet("/users/{userId:guid}", (Guid userId, WalletService wallet, CancellationToken ct) =>
+            GetAccountAsync(userId, wallet, ct));
+
+        backoffice.MapGet("/users/{userId:guid}/balance", (Guid userId, DateTimeOffset asOf, WalletService wallet, CancellationToken ct) =>
+            GetBalanceAsync(userId, asOf, wallet, ct));
+
+        // Ajuste manual de saldo. La doble aprobacion y el registro de auditoria llegan en la fase 5.
+        backoffice.MapPost("/users/{userId:guid}/credit", async (Guid userId, HttpRequest http, CreditRequest body, WalletService wallet, CancellationToken ct) =>
         {
-            var accountId = await wallet.OpenAccountAsync(request.UserId, ct);
-            return Results.Created($"/wallet/accounts/{accountId}", new { accountId });
+            var key = http.Headers[IdempotencyHeader].ToString();
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: nameof(WalletError.InvalidIdempotencyKey),
+                    detail: $"El header {IdempotencyHeader} es obligatorio.");
+            }
+
+            var outcome = await wallet.CreditAsync(PlayerIds.WalletAccountFor(userId), key, body.Amount, ct);
+            return Results.Ok(new OperationResponse(outcome.TransactionId, outcome.IsDuplicate));
         });
-
-        group.MapGet("/accounts/{accountId:guid}", async (Guid accountId, WalletService wallet, CancellationToken ct) =>
-        {
-            var account = await wallet.GetAsync(accountId, ct);
-            return Results.Ok(new AccountResponse(
-                account.Id, account.UserId, account.Available, account.Reserved, account.Version, account.OpenReservations));
-        });
-
-        group.MapGet("/accounts/{accountId:guid}/balance", async (Guid accountId, DateTimeOffset asOf, WalletService wallet, CancellationToken ct) =>
-        {
-            var balance = await wallet.GetBalanceAtAsync(accountId, asOf, ct);
-            return balance is null
-                ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "AccountNotOpenYet", detail: "La cuenta aun no existia en esa fecha.")
-                : Results.Ok(balance);
-        });
-
-        group.MapPost("/accounts/{accountId:guid}/credit", (Guid accountId, HttpRequest http, CreditRequest body, WalletService wallet, CancellationToken ct) =>
-            Execute(http, key => wallet.CreditAsync(accountId, key, body.Amount, ct)));
-
-        group.MapPost("/accounts/{accountId:guid}/reserve", (Guid accountId, HttpRequest http, ReserveRequest body, WalletService wallet, CancellationToken ct) =>
-            Execute(http, key => wallet.ReserveAsync(accountId, key, body.ReservationId, body.Stake, ct)));
-
-        group.MapPost("/accounts/{accountId:guid}/settle", (Guid accountId, HttpRequest http, SettleRequest body, WalletService wallet, CancellationToken ct) =>
-            Execute(http, key => wallet.SettleAsync(accountId, key, body.ReservationId, body.Payout, ct)));
-
-        group.MapPost("/accounts/{accountId:guid}/release", (Guid accountId, HttpRequest http, ReleaseRequest body, WalletService wallet, CancellationToken ct) =>
-            Execute(http, key => wallet.ReleaseAsync(accountId, key, body.ReservationId, ct)));
-
-        group.MapPost("/accounts/{accountId:guid}/reverse", (Guid accountId, HttpRequest http, ReverseRequest body, WalletService wallet, CancellationToken ct) =>
-            Execute(http, key => wallet.ReverseAsync(accountId, key, body.TransactionId, ct)));
     }
 
-    private static async Task<IResult> Execute(HttpRequest http, Func<string, Task<OperationOutcome>> operation)
+    private static async Task<IResult> GetAccountAsync(Guid userId, WalletService wallet, CancellationToken ct)
     {
-        var key = http.Headers[IdempotencyHeader].ToString();
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: nameof(WalletError.InvalidIdempotencyKey),
-                detail: $"El header {IdempotencyHeader} es obligatorio.");
-        }
+        var account = await wallet.GetAsync(PlayerIds.WalletAccountFor(userId), ct);
+        return Results.Ok(new AccountResponse(
+            account.Id, account.UserId, account.Available, account.Reserved, account.Version, account.OpenReservations));
+    }
 
-        var outcome = await operation(key);
-        return Results.Ok(new OperationResponse(outcome.TransactionId, outcome.IsDuplicate));
+    private static async Task<IResult> GetBalanceAsync(Guid userId, DateTimeOffset asOf, WalletService wallet, CancellationToken ct)
+    {
+        var balance = await wallet.GetBalanceAtAsync(PlayerIds.WalletAccountFor(userId), asOf, ct);
+        return balance is null
+            ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "AccountNotOpenYet", detail: "La cuenta aun no existia en esa fecha.")
+            : Results.Ok(balance);
     }
 
     private static async ValueTask<object?> MapDomainErrors(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
