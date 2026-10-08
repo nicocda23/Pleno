@@ -1,4 +1,5 @@
 using Casino.Modules.Games.Fairness;
+using Casino.Modules.Games.Roulette;
 using Marten;
 
 namespace Casino.Modules.Games.Infrastructure;
@@ -17,5 +18,8 @@ public static class GamesMartenConfiguration
             typeof(BetCompleted),
             typeof(SeedPairRotated),
         ]);
+
+        // Dos manejadores que procesen el mismo mensaje a la vez no pueden pisarse: el segundo falla y reintenta.
+        options.Schema.For<RouletteRound>().Identity(r => r.Id).UseOptimisticConcurrency(true);
     }
 }

@@ -70,6 +70,11 @@ internal static class CasinoInfrastructure
         options.ListenToRabbitQueue(WalletCommandsQueue).UseDurableInbox();
         options.PublishMessage<ReserveStake>().ToRabbitQueue(WalletCommandsQueue);
         options.PublishMessage<RoundResolved>().ToRabbitQueue(WalletCommandsQueue);
+        options.PublishMessage<ExpireReservation>().ToRabbitQueue(WalletCommandsQueue);
+
+        // Los juegos consumen los hechos de la Wallet. Cada cola del fanout recibe TODOS los hechos: cada consumidor ignora los que no le interesan.
+        options.ListenToRabbitQueue(GamesWalletEventsQueue).UseDurableInbox();
+        options.UnknownMessageBehavior = UnknownMessageBehavior.LogOnly;
 
         // Hechos de la Wallet: pub/sub. Un exchange "fanout" copia cada hecho a la cola de cada consumidor,
         // asi sumar un consumidor nuevo (por ejemplo, otro juego) no requiere tocar a la Wallet.

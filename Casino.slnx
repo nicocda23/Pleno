@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Casino.Api/Casino.Api.csproj" />
     <Project Path="src/Casino.AppHost/Casino.AppHost.csproj" />
+    <Project Path="src/Casino.BuildingBlocks/Casino.BuildingBlocks.csproj" />
     <Project Path="src/Casino.Contracts/Casino.Contracts.csproj" />
     <Project Path="src/Casino.ServiceDefaults/Casino.ServiceDefaults.csproj" />
   </Folder>

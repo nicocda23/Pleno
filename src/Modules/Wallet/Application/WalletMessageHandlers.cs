@@ -42,3 +42,22 @@ public sealed class RoundResolvedHandler(WalletService wallet)
         }
     }
 }
+
+/// <summary>
+/// Vencimiento de una reserva (mensaje programado). Si ya se liquido o libero, no hace nada; si sigue abierta, la libera
+/// y la Wallet publica StakeReleased para que el juego anule su ronda.
+/// </summary>
+public sealed class ExpireReservationHandler(WalletService wallet)
+{
+    public async Task Handle(ExpireReservation message, CancellationToken ct)
+    {
+        try
+        {
+            await wallet.ReleaseAsync(message.AccountId, $"expire:{message.BetId:N}", message.BetId, ct);
+        }
+        catch (WalletDomainException ex) when (ex.Error is WalletError.ReservationNotOpen or WalletError.ReservationNotFound)
+        {
+            // Ya se liquido (el caso normal) o nunca existio: nada que compensar.
+        }
+    }
+}

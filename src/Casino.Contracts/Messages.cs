@@ -27,3 +27,6 @@ public sealed record StakeSettlementRejected(Guid BetId, Guid AccountId, string 
 
 /// <summary>Cambio de saldo de una cuenta, para quien necesite mostrarlo en vivo.</summary>
 public sealed record BalanceChanged(Guid AccountId, long Available, long Reserved, long Version);
+
+/// <summary>Mensaje programado por la Wallet para si misma: si la reserva sigue abierta al vencer, se libera.</summary>
+public sealed record ExpireReservation(Guid BetId, Guid AccountId);

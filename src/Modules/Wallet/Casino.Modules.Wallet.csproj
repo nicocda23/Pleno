@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Casino.Contracts\Casino.Contracts.csproj" />
+    <ProjectReference Include="..\..\Casino.BuildingBlocks\Casino.BuildingBlocks.csproj" />
   </ItemGroup>
 
 </Project>

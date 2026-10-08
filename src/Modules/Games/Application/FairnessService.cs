@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using Casino.BuildingBlocks;
 using Casino.Modules.Games.Fairness;
 using Casino.Modules.Games.Infrastructure;
 using JasperFx;
@@ -34,7 +35,8 @@ public sealed class FairnessService(
     IDocumentStore store,
     SeedProtector protector,
     TimeProvider clock,
-    int maxAttempts = FairnessService.DefaultMaxAttempts)
+    int maxAttempts = FairnessService.DefaultMaxAttempts,
+    IOutboxFactory? outbox = null)
 {
     public const int DefaultMaxAttempts = 20;
 
@@ -50,9 +52,19 @@ public sealed class FairnessService(
     /// <summary>
     /// Asigna el nonce a una apuesta. Atomico (la version del stream impide dos asignaciones iguales)
     /// e idempotente por apuesta. El cliente no participa: no puede elegir ni influir el nonce.
+    /// <paramref name="inSameTransaction"/> se ejecuta solo cuando el nonce se asigna por primera vez y antes del commit:
+    /// lo que haga con la sesion (guardar la ronda, encolar mensajes) se confirma o se revierte junto con la asignacion.
     /// </summary>
-    public Task<NonceAllocation> AllocateNonceAsync(Guid userId, Guid betId, CancellationToken ct = default) =>
-        ExecuteAsync(userId, a => a.AllocateNonce(betId, clock.GetUtcNow()), ct);
+    public Task<NonceAllocation> AllocateNonceAsync(
+        Guid userId,
+        Guid betId,
+        Func<IDocumentSession, IOutboxSession, NonceAllocation, ValueTask>? inSameTransaction = null,
+        CancellationToken ct = default) =>
+        ExecuteAsync(
+            userId,
+            a => a.AllocateNonce(betId, clock.GetUtcNow()),
+            ct,
+            inSameTransaction is null ? null : (session, outboxSession, allocation) => inSameTransaction(session, outboxSession!, allocation));
 
     /// <summary>Marca la apuesta como resuelta o anulada. Mientras haya apuestas pendientes no se puede rotar.</summary>
     public Task CompleteBetAsync(Guid userId, Guid betId, CancellationToken ct = default) =>
@@ -102,7 +114,11 @@ public sealed class FairnessService(
         return (pairId, ProvablyFair.Commitment(serverSeed), protector.Protect(serverSeed, Aad(userId, pairId)));
     }
 
-    private async Task<T> ExecuteAsync<T>(Guid userId, Func<FairnessAccount, T> operation, CancellationToken ct)
+    private async Task<T> ExecuteAsync<T>(
+        Guid userId,
+        Func<FairnessAccount, T> operation,
+        CancellationToken ct,
+        Func<IDocumentSession, IOutboxSession?, T, ValueTask>? beforeSave = null)
     {
         for (var attempt = 1; ; attempt++)
         {
@@ -143,6 +159,13 @@ public sealed class FairnessService(
                     session.Events.Append(userId, loadedVersion + newEvents.Length, newEvents);
                 }
 
+                // El outbox vive hasta despues del commit: lo que se encole sale con la misma transaccion.
+                await using var outboxSession = beforeSave is not null ? outbox?.Enroll(session) : null;
+                if (beforeSave is not null)
+                {
+                    await beforeSave(session, outboxSession, result);
+                }
+
                 await session.SaveChangesAsync(ct);
                 return result;
             }
@@ -167,6 +190,7 @@ public sealed class FairnessService(
                 or JasperFx.Events.ExistingStreamIdCollisionException
                 or Marten.Exceptions.ExistingStreamIdCollisionException
                 or ConcurrencyException
+                or DocumentAlreadyExistsException
                 or PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }
                 or TimeoutException
                 or IOException

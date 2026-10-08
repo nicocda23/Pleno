@@ -1,4 +1,6 @@
 using System.Net.Sockets;
+using Casino.BuildingBlocks;
+using Casino.Contracts;
 using Casino.Modules.Wallet.Domain;
 using Casino.Modules.Wallet.Infrastructure;
 using JasperFx;
@@ -23,10 +25,12 @@ public sealed class WalletService(
     TimeProvider clock,
     int maxAttempts = WalletService.DefaultMaxAttempts,
     int snapshotEvery = WalletService.DefaultSnapshotEvery,
-    IOutboxFactory? outbox = null)
+    IOutboxFactory? outbox = null,
+    TimeSpan? reservationTtl = null)
 {
     public const int DefaultMaxAttempts = 20;
     public const int DefaultSnapshotEvery = 50;
+    public static readonly TimeSpan DefaultReservationTtl = TimeSpan.FromSeconds(60);
 
     private const int GateCount = 256;
 
@@ -148,6 +152,14 @@ public sealed class WalletService(
                     {
                         await outboxSession.PublishAsync(message);
                     }
+                    // Compensacion por vencimiento: si nadie liquida la reserva a tiempo, la Wallet la libera sola.
+                    foreach (var reserved in account.UncommittedEvents.OfType<BetReserved>())
+                    {
+                        await outboxSession.PublishAsync(
+                            new ExpireReservation(reserved.ReservationId, accountId),
+                            reservationTtl ?? DefaultReservationTtl);
+                    }
+
                 }
 
                 await session.SaveChangesAsync(ct);

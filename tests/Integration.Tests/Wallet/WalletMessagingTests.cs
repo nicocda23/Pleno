@@ -1,4 +1,5 @@
 using Casino.Contracts;
+using Casino.BuildingBlocks;
 using Casino.Modules.Wallet.Application;
 using Marten;
 using Microsoft.AspNetCore.Hosting;
@@ -20,7 +21,7 @@ namespace Casino.Integration.Tests.Wallet;
 [Collection(WalletDbDefinition.Name)]
 public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rabbit, ITestOutputHelper output) : IAsyncLifetime
 {
-    // La cola de "juegos" tiene el consumidor de prueba; la de tiempo real no tiene ninguno y acumula lo que llega al broker.
+    // La cola de juegos la consume el modulo Games; la de tiempo real todavia no tiene consumidor y acumula lo que llega al broker.
     private const string GamesQueue = "games.wallet-events";
     private const string RealtimeQueue = "realtime.wallet-events";
 
@@ -36,11 +37,6 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
             builder.UseSetting("ConnectionStrings:casinodb", db.ConnectionString);
             builder.UseSetting("ConnectionStrings:rabbitmq", rabbit.ConnectionString);
             builder.UseSetting("Fairness:MasterKey", db.MasterKey);
-            builder.ConfigureServices(services => services.ConfigureWolverine(options =>
-            {
-                options.Discovery.IncludeAssembly(typeof(WalletEventsConsumer).Assembly);
-                options.ListenToRabbitQueue(GamesQueue);
-            }));
         });
         _host = _factory.Services.GetRequiredService<IHost>();
         _wallet = _factory.Services.GetRequiredService<WalletService>();
@@ -241,23 +237,4 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
         Assert.True(depthAfter >= depthBefore + 2, "Los hechos no llegaron al broker tras recuperarse.");
         Assert.Equal(0, await PendingOutgoingAsync());
     }
-}
-
-/// <summary>
-/// Consumidor de prueba de los hechos de la Wallet. Hace de "juego": sin un consumidor, el rastreo de Wolverine
-/// esperaria para siempre que alguien reciba lo que se publica al exchange.
-/// </summary>
-public sealed class WalletEventsConsumer
-{
-    public static void Handle(StakeReserved message) => _ = message;
-
-    public static void Handle(StakeRejected message) => _ = message;
-
-    public static void Handle(StakeSettled message) => _ = message;
-
-    public static void Handle(StakeReleased message) => _ = message;
-
-    public static void Handle(StakeSettlementRejected message) => _ = message;
-
-    public static void Handle(BalanceChanged message) => _ = message;
 }
