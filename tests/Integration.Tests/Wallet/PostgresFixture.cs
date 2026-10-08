@@ -1,3 +1,5 @@
+using Casino.Modules.Games.Application;
+using Casino.Modules.Games.Infrastructure;
 using Casino.Modules.Wallet.Application;
 using Casino.Modules.Wallet.Infrastructure;
 using Marten;
@@ -17,6 +19,13 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public WalletService Wallet { get; private set; } = null!;
 
+    /// <summary>Clave maestra de pruebas: se genera por corrida y nunca se escribe en disco.</summary>
+    public string MasterKey { get; } = SeedProtector.GenerateBase64Key();
+
+    public FairnessService Fairness { get; private set; } = null!;
+
+    public SeedProtector Protector => SeedProtector.FromBase64Key(MasterKey);
+
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
@@ -26,9 +35,14 @@ public sealed class PostgresFixture : IAsyncLifetime
             MaxPoolSize = 80,
         }.ConnectionString;
 
-        Store = DocumentStore.For(options => WalletMartenConfiguration.Configure(options, ConnectionString));
+        Store = DocumentStore.For(options =>
+        {
+            WalletMartenConfiguration.Configure(options, ConnectionString);
+            GamesMartenConfiguration.Register(options);
+        });
         await Store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
         Wallet = new WalletService(Store, TimeProvider.System);
+        Fairness = new FairnessService(Store, Protector, TimeProvider.System);
     }
 
     public async Task DisposeAsync()

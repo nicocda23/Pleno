@@ -1,19 +1,23 @@
+using Casino.Modules.Games.Api;
 using Casino.Modules.Wallet.Api;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.Services.AddCasinoStore();
 builder.Services.AddWalletModule();
+builder.Services.AddGamesModule();
 
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
 app.MapGet("/", () => "Casino API");
 
-// La Wallet no tiene autenticacion todavia (fase 3): solo se expone en Development.
+// Los modulos no tienen autenticacion todavia (fase 3): solo se exponen en Development.
 if (app.Environment.IsDevelopment())
 {
     app.MapWalletModule();
+    app.MapGamesModule();
 }
 
 app.Run();

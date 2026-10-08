@@ -1,8 +1,5 @@
 using Casino.Modules.Wallet.Application;
-using Casino.Modules.Wallet.Infrastructure;
-using Marten;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -10,16 +7,10 @@ namespace Casino.Modules.Wallet.Api;
 
 public static class WalletModule
 {
-    /// <summary>Registra Marten y el servicio de la Wallet. La connection string se lee de ConnectionStrings:casinodb.</summary>
+    /// <summary>Requiere que el host registre antes el IDocumentStore (compartido entre modulos).</summary>
     public static IServiceCollection AddWalletModule(this IServiceCollection services)
     {
         services.TryAddSingleton(TimeProvider.System);
-        services.AddSingleton<IDocumentStore>(sp =>
-        {
-            var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("casinodb")
-                ?? throw new InvalidOperationException("Falta la connection string 'casinodb' (la inyecta Aspire).");
-            return DocumentStore.For(options => WalletMartenConfiguration.Configure(options, connectionString));
-        });
         services.AddSingleton<WalletService>();
         return services;
     }

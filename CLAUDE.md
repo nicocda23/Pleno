@@ -15,6 +15,7 @@ Laboratorio de arquitectura distribuida en .NET. Ver `README.md` y `docs/PLAN.md
 - Montos de fichas como **enteros** (`long`); nunca `float`/`double`/`decimal` para saldos.
 - El saldo se **deriva** de asientos de partida doble; nunca se edita directamente.
 - Toda operacion que mueve fichas lleva `IdempotencyKey`.
+- **Clave maestra del RNG** (`Fairness:MasterKey`): user-secrets en local (`dotnet user-secrets set ... --project src/Casino.Api`), Key Vault en la nube.
 - **Nada de secretos** en codigo, `appsettings.json`, `.env` versionados ni pipelines: user-secrets en local, Key Vault en la nube.
 - PII (email, nombre, documento) enmascarada en logs y fuera de trazas/metricas. Datos de prueba solo con Bogus.
 - Tests obligatorios para todo lo que toque la Wallet (unitarios + integracion con Testcontainers).
