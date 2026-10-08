@@ -108,8 +108,8 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 - [x] Ruleta europea como primer juego (lógica pura, 100% testeada) con todas las apuestas
 - [x] Outbox en Wallet e Inbox en Game Engine sobre RabbitMQ
 - [x] Saga de apuesta con timeout y compensación (coreografiada, ver ADR 0002)
-- [ ] Hub de SignalR para saldo y resultados en vivo
-- [ ] Página de verificación de jugadas para el usuario
+- [x] Hub de SignalR para saldo y resultados en vivo (con backplane de Redis y avisos autenticados)
+- [x] Página de verificación de jugadas para el usuario (estática en /verify, calcula todo en el navegador)
 
 ### Fase 3 — Frontend llamativo (2 semanas)
 

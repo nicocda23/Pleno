@@ -25,3 +25,7 @@ jobs:
       - run: dotnet build Casino.slnx --no-restore -c Release -warnaserror
       - run: dotnet test Casino.slnx --no-build -c Release
       - run: dotnet format Casino.slnx --verify-no-changes --no-restore
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --test "tests/web/*.test.mjs"

@@ -42,6 +42,25 @@ public sealed class RabbitMqFixture : IAsyncLifetime
         return (await channel.QueueDeclarePassiveAsync(queue)).MessageCount;
     }
 
+    /// <summary>
+    /// Crea una cola durable SIN consumidor, enlazada a los exchanges indicados: acumula copia de todo lo que se publique ahi.
+    /// Sirve para comprobar que un mensaje llego de verdad al broker, aunque la aplicacion tenga sus propios consumidores.
+    /// </summary>
+    public async Task<string> CreateAuditQueueAsync(params string[] exchanges)
+    {
+        var queue = $"test.audit.{Guid.NewGuid():N}";
+        var factory = new ConnectionFactory { Uri = new Uri(ConnectionString) };
+        await using var connection = await factory.CreateConnectionAsync();
+        await using var channel = await connection.CreateChannelAsync();
+        await channel.QueueDeclareAsync(queue, durable: true, exclusive: false, autoDelete: false);
+        foreach (var exchange in exchanges)
+        {
+            await channel.QueueBindAsync(queue, exchange, routingKey: string.Empty);
+        }
+
+        return queue;
+    }
+
     private static int FreePort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
