@@ -70,3 +70,21 @@ El ultimo vector consume mas de 32 bytes, asi que cubre el cambio de `cursor`.
 - El servidor no puede cambiar la seed despues de ver la apuesta: el `commitment` ya estaba publicado.
 - El servidor no puede elegir el resultado: depende de `clientSeed` y `nonce`, que controla el jugador y el contador.
 - El jugador no puede predecir resultados mientras la seed esta en uso: no conoce `serverSeed`.
+
+## Gestion de seeds en la plataforma
+
+- **Un par de seeds por usuario** (un stream de eventos por usuario). El servidor asigna el nonce de forma atomica (la version
+  del stream impide dos asignaciones iguales) y es idempotente por apuesta: reintentar la misma apuesta devuelve el mismo nonce.
+- **El cliente no controla ningun valor.** Ni el nonce ni la server seed se aceptan por la API. La client seed solo se fija al
+  empezar un par: cambiarla a mitad de camino permitiria volver a una seed anterior, repetir resultados ya conocidos y apostar
+  a lo que se sabe que va a salir. Para cambiarla hay que **rotar**.
+- **Rotar** revela la server seed activa, empieza un par nuevo (nuevo compromiso, nonce desde 0) y esta **bloqueado mientras
+  haya apuestas sin resolver**, porque revelar la seed expondria el resultado de una jugada en curso.
+- **Cifrado en reposo:** la server seed se guarda cifrada con AES-256-GCM. El dato asociado (usuario + par) ata cada texto
+  cifrado a su dueño. La clave maestra (`Fairness:MasterKey`, 32 bytes en base64) vive en user-secrets en local y en Key Vault
+  en la nube; **nunca en el repo**. Perder la clave implica perder las seeds activas.
+- Un par cerrado ya tiene su server seed revelada: sus jugadas se pueden verificar con datos publicos.
+
+```
+dotnet user-secrets set "Fairness:MasterKey" "<32 bytes aleatorios en base64>" --project src/Casino.Api
+```

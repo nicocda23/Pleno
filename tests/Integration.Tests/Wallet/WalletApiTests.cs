@@ -18,6 +18,7 @@ public sealed class WalletApiTests : IDisposable
         {
             builder.UseEnvironment("Development");
             builder.UseSetting("ConnectionStrings:casinodb", db.ConnectionString);
+            builder.UseSetting("Fairness:MasterKey", db.MasterKey);
         });
         _client = _factory.CreateClient();
     }
