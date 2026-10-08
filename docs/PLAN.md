@@ -104,8 +104,8 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 
 ### Fase 2 — Primer juego y tiempo real (1 a 2 semanas)
 
-- [ ] RNG provably fair: server seed hasheado, client seed y nonce
-- [ ] Ruleta europea como primer juego (lógica pura, 100% testeada)
+- [ ] RNG provably fair: server seed hasheado, client seed y nonce (algoritmo y especificación hechos; falta persistir seeds, rotación y cifrado: paso 2b)
+- [x] Ruleta europea como primer juego (lógica pura, 100% testeada) con todas las apuestas
 - [ ] Outbox en Wallet e Inbox en Game Engine sobre RabbitMQ
 - [ ] Saga de apuesta con timeout y compensación
 - [ ] Hub de SignalR para saldo y resultados en vivo
