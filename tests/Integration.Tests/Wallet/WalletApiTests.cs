@@ -1,127 +1,143 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.AspNetCore.Hosting;
+using Casino.BuildingBlocks;
+using Casino.Modules.Wallet.Application;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Casino.Integration.Tests.Wallet;
 
 [Collection(WalletDbDefinition.Name)]
 public sealed class WalletApiTests : IDisposable
 {
-    private readonly WebApplicationFactory<Program> _factory;
-    private readonly HttpClient _client;
+    private readonly WebApplicationFactory<Program> _app;
 
     public WalletApiTests(PostgresFixture db)
     {
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        _app = TestAuth.StartApp(db);
+    }
+
+    public void Dispose() => _app.Dispose();
+
+    private async Task<Guid> FundedPlayerAsync(long chips)
+    {
+        var userId = Guid.NewGuid();
+        var wallet = _app.Services.GetRequiredService<WalletService>();
+        var accountId = await wallet.OpenAccountAsync(userId);
+        await wallet.CreditAsync(accountId, "initial-credit", chips);
+        return userId;
+    }
+
+    private static async Task<HttpResponseMessage> CreditAsync(HttpClient client, Guid userId, long amount, string? key)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/backoffice/wallet/users/{userId}/credit")
         {
-            builder.UseEnvironment("Development");
-            builder.UseSetting("ConnectionStrings:casinodb", db.ConnectionString);
-            builder.UseSetting("Fairness:MasterKey", db.MasterKey);
-        });
-        _client = _factory.CreateClient();
-    }
-
-    public void Dispose()
-    {
-        _client.Dispose();
-        _factory.Dispose();
-    }
-
-    private async Task<Guid> OpenAccountAsync()
-    {
-        var response = await _client.PostAsJsonAsync("/wallet/accounts", new { userId = Guid.NewGuid() });
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("accountId").GetGuid();
-    }
-
-    private Task<HttpResponseMessage> PostAsync(Guid accountId, string operation, object body, string? key)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/wallet/accounts/{accountId}/{operation}")
-        {
-            Content = JsonContent.Create(body),
+            Content = JsonContent.Create(new { amount }),
         };
         if (key is not null)
         {
             request.Headers.Add("Idempotency-Key", key);
         }
 
-        return _client.SendAsync(request);
-    }
-
-    private static async Task<string?> ProblemTitleAsync(HttpResponseMessage response) =>
-        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("title").GetString();
-
-    [Fact]
-    public async Task Bet_lifecycle_over_http_updates_the_balance()
-    {
-        var accountId = await OpenAccountAsync();
-        var reservationId = Guid.NewGuid();
-
-        Assert.Equal(HttpStatusCode.OK, (await PostAsync(accountId, "credit", new { amount = 1_000 }, "k-credit")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await PostAsync(accountId, "reserve", new { reservationId, stake = 100 }, "k-reserve")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await PostAsync(accountId, "settle", new { reservationId, payout = 250 }, "k-settle")).StatusCode);
-
-        var account = await _client.GetFromJsonAsync<JsonElement>($"/wallet/accounts/{accountId}");
-        Assert.Equal(1_150, account.GetProperty("available").GetInt64());
-        Assert.Equal(0, account.GetProperty("reserved").GetInt64());
+        return await client.SendAsync(request);
     }
 
     [Fact]
-    public async Task Repeating_a_request_returns_the_original_transaction_and_flags_the_duplicate()
+    public async Task A_player_reads_only_their_own_account()
     {
-        var accountId = await OpenAccountAsync();
+        var userId = await FundedPlayerAsync(700);
+        var other = await FundedPlayerAsync(5_000);
+        using var client = _app.ClientFor(userId);
 
-        var first = await (await PostAsync(accountId, "credit", new { amount = 500 }, "k1")).Content.ReadFromJsonAsync<JsonElement>();
-        var second = await (await PostAsync(accountId, "credit", new { amount = 500 }, "k1")).Content.ReadFromJsonAsync<JsonElement>();
+        var account = await client.GetFromJsonAsync<JsonElement>("/wallet/me");
 
-        Assert.False(first.GetProperty("isDuplicate").GetBoolean());
-        Assert.True(second.GetProperty("isDuplicate").GetBoolean());
-        Assert.Equal(first.GetProperty("transactionId").GetGuid(), second.GetProperty("transactionId").GetGuid());
-
-        var account = await _client.GetFromJsonAsync<JsonElement>($"/wallet/accounts/{accountId}");
-        Assert.Equal(500, account.GetProperty("available").GetInt64());
-    }
-
-    [Fact]
-    public async Task Errors_are_mapped_to_meaningful_status_codes()
-    {
-        var accountId = await OpenAccountAsync();
-        await PostAsync(accountId, "credit", new { amount = 100 }, "k-credit");
-
-        var missingKey = await PostAsync(accountId, "credit", new { amount = 100 }, key: null);
-        Assert.Equal(HttpStatusCode.BadRequest, missingKey.StatusCode);
-
-        var reusedKey = await PostAsync(accountId, "credit", new { amount = 999 }, "k-credit");
-        Assert.Equal(HttpStatusCode.Conflict, reusedKey.StatusCode);
-        Assert.Equal("IdempotencyKeyReused", await ProblemTitleAsync(reusedKey));
-
-        var insufficient = await PostAsync(accountId, "reserve", new { reservationId = Guid.NewGuid(), stake = 5_000 }, "k-big");
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, insufficient.StatusCode);
-
-        var invalidAmount = await PostAsync(accountId, "credit", new { amount = -5 }, "k-negative");
-        Assert.Equal(HttpStatusCode.BadRequest, invalidAmount.StatusCode);
-
-        var unknownAccount = await PostAsync(Guid.NewGuid(), "credit", new { amount = 10 }, "k-ghost");
-        Assert.Equal(HttpStatusCode.NotFound, unknownAccount.StatusCode);
+        Assert.Equal(700, account.GetProperty("available").GetInt64());
+        Assert.Equal(PlayerIds.WalletAccountFor(userId), account.GetProperty("accountId").GetGuid());
+        Assert.NotEqual(PlayerIds.WalletAccountFor(other), account.GetProperty("accountId").GetGuid());
     }
 
     [Fact]
     public async Task Audit_endpoint_rebuilds_the_balance_at_a_date()
     {
-        var accountId = await OpenAccountAsync();
-        await PostAsync(accountId, "credit", new { amount = 700 }, "k-credit");
-
+        var userId = await FundedPlayerAsync(700);
+        using var client = _app.ClientFor(userId);
         static string Iso(DateTimeOffset date) => Uri.EscapeDataString(date.UtcDateTime.ToString("o"));
 
-        var now = await _client.GetFromJsonAsync<JsonElement>(
-            $"/wallet/accounts/{accountId}/balance?asOf={Iso(DateTimeOffset.UtcNow.AddMinutes(5))}");
+        var now = await client.GetFromJsonAsync<JsonElement>($"/wallet/me/balance?asOf={Iso(DateTimeOffset.UtcNow.AddMinutes(5))}");
         Assert.Equal(700, now.GetProperty("total").GetInt64());
 
-        var beforeOpening = await _client.GetAsync(
-            $"/wallet/accounts/{accountId}/balance?asOf={Iso(DateTimeOffset.UtcNow.AddDays(-1))}");
+        var beforeOpening = await client.GetAsync($"/wallet/me/balance?asOf={Iso(DateTimeOffset.UtcNow.AddDays(-1))}");
         Assert.Equal(HttpStatusCode.NotFound, beforeOpening.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_player_without_an_account_gets_not_found()
+    {
+        using var client = _app.ClientFor(Guid.NewGuid());
+
+        var response = await client.GetAsync("/wallet/me");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Backoffice_credits_a_user_idempotently()
+    {
+        var userId = await FundedPlayerAsync(100);
+        using var backoffice = _app.ClientFor(Guid.NewGuid(), Roles.Backoffice);
+
+        var first = await (await CreditAsync(backoffice, userId, 500, "adjust-1")).Content.ReadFromJsonAsync<JsonElement>();
+        var second = await (await CreditAsync(backoffice, userId, 500, "adjust-1")).Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.False(first.GetProperty("isDuplicate").GetBoolean());
+        Assert.True(second.GetProperty("isDuplicate").GetBoolean());
+        Assert.Equal(first.GetProperty("transactionId").GetGuid(), second.GetProperty("transactionId").GetGuid());
+
+        var account = await backoffice.GetFromJsonAsync<JsonElement>($"/backoffice/wallet/users/{userId}");
+        Assert.Equal(600, account.GetProperty("available").GetInt64());
+    }
+
+    [Fact]
+    public async Task Backoffice_errors_are_mapped_to_meaningful_status_codes()
+    {
+        var userId = await FundedPlayerAsync(100);
+        using var backoffice = _app.ClientFor(Guid.NewGuid(), Roles.Backoffice);
+        await CreditAsync(backoffice, userId, 10, "k-credit");
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await CreditAsync(backoffice, userId, 10, key: null)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await CreditAsync(backoffice, userId, -5, "k-negative")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await CreditAsync(backoffice, Guid.NewGuid(), 10, "k-ghost")).StatusCode);
+
+        var reused = await CreditAsync(backoffice, userId, 999, "k-credit");
+        Assert.Equal(HttpStatusCode.Conflict, reused.StatusCode);
+        Assert.Equal("IdempotencyKeyReused", (await reused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task A_player_cannot_use_backoffice_endpoints_on_any_account_including_their_own()
+    {
+        var userId = await FundedPlayerAsync(100);
+        using var player = _app.ClientFor(userId);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await CreditAsync(player, userId, 1_000_000, "give-me-chips")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await player.GetAsync($"/backoffice/wallet/users/{userId}")).StatusCode);
+        Assert.Equal(100, (await _app.Services.GetRequiredService<WalletService>().GetAsync(PlayerIds.WalletAccountFor(userId))).Available);
+    }
+
+    [Theory]
+    [InlineData("reserve")]
+    [InlineData("settle")]
+    [InlineData("release")]
+    [InlineData("reverse")]
+    [InlineData("credit")]
+    public async Task Internal_wallet_operations_are_not_reachable_over_http(string operation)
+    {
+        var userId = await FundedPlayerAsync(100);
+        using var player = _app.ClientFor(userId);
+
+        var response = await player.PostAsJsonAsync($"/wallet/accounts/{PlayerIds.WalletAccountFor(userId)}/{operation}", new { amount = 10 });
+
+        Assert.True(response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed);
     }
 }

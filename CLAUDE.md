@@ -15,6 +15,7 @@ Laboratorio de arquitectura distribuida en .NET. Ver `README.md` y `docs/PLAN.md
 - Montos de fichas como **enteros** (`long`); nunca `float`/`double`/`decimal` para saldos.
 - El saldo se **deriva** de asientos de partida doble; nunca se edita directamente.
 - Toda operacion que mueve fichas lleva `IdempotencyKey`.
+- **Identidad:** Keycloak (ver `docs/autenticacion.md`). La identidad sale del token, nunca del cuerpo; las cuentas se derivan del usuario con `PlayerIds`.
 - **Clave maestra del RNG** (`Fairness:MasterKey`): user-secrets en local (`dotnet user-secrets set ... --project src/Casino.Api`), Key Vault en la nube.
 - **Nada de secretos** en codigo, `appsettings.json`, `.env` versionados ni pipelines: user-secrets en local, Key Vault en la nube.
 - PII (email, nombre, documento) enmascarada en logs y fuera de trazas/metricas. Datos de prueba solo con Bogus.
@@ -22,4 +23,4 @@ Laboratorio de arquitectura distribuida en .NET. Ver `README.md` y `docs/PLAN.md
 - Cada fase cierra con un ADR en `docs/adr/`.
 
 ## Estructura
-`src/Casino.AppHost`, `src/Casino.ServiceDefaults`, `src/Casino.Api`, `src/Modules/{Wallet,Games,Realtime,Users,Promotions}`, `tests/`, `web/`, `docs/`.
+`src/Casino.AppHost` (con `realms/` de Keycloak), `src/Casino.Contracts`, `src/Casino.BuildingBlocks`, `src/Casino.ServiceDefaults`, `src/Casino.Api`, `src/Modules/{Wallet,Games,Realtime,Users,Promotions}`, `tests/`, `web/`, `docs/`.

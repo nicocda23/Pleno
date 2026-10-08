@@ -1,5 +1,6 @@
 using Casino.Contracts;
 using Casino.Modules.Wallet.Domain;
+using Microsoft.Extensions.Configuration;
 
 namespace Casino.Modules.Wallet.Application;
 
@@ -58,6 +59,28 @@ public sealed class ExpireReservationHandler(WalletService wallet)
         catch (WalletDomainException ex) when (ex.Error is WalletError.ReservationNotOpen or WalletError.ReservationNotFound)
         {
             // Ya se liquido (el caso normal) o nunca existio: nada que compensar.
+        }
+    }
+}
+
+/// <summary>
+/// Un jugador nuevo: se abre su cuenta (el id se deriva del usuario) y se le acreditan las fichas de bienvenida.
+/// Idempotente: abrir la cuenta y la clave "welcome-bonus" garantizan que un duplicado no regale fichas dos veces.
+/// </summary>
+public sealed class UserRegisteredHandler(WalletService wallet, IConfiguration configuration)
+{
+    private const long DefaultWelcomeChips = 1_000;
+
+    public async Task Handle(UserRegistered message, CancellationToken ct)
+    {
+        var accountId = await wallet.OpenAccountAsync(message.UserId, ct);
+
+        var welcome = long.TryParse(configuration["Wallet:WelcomeChips"], out var configured) && configured >= 0
+            ? configured
+            : DefaultWelcomeChips;
+        if (welcome > 0)
+        {
+            await wallet.CreditAsync(accountId, "welcome-bonus", welcome, ct);
         }
     }
 }

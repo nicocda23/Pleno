@@ -30,3 +30,8 @@ public sealed record BalanceChanged(Guid AccountId, long Available, long Reserve
 
 /// <summary>Mensaje programado por la Wallet para si misma: si la reserva sigue abierta al vencer, se libera.</summary>
 public sealed record ExpireReservation(Guid BetId, Guid AccountId);
+
+// ---- Usuarios ----
+
+/// <summary>Un jugador entro por primera vez. La Wallet abre su cuenta (el id se deriva del usuario) y le acredita las fichas de bienvenida.</summary>
+public sealed record UserRegistered(Guid UserId);

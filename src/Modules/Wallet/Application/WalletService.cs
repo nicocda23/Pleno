@@ -39,14 +39,34 @@ public sealed class WalletService(
     // concurrencia optimista de la base de datos.
     private readonly SemaphoreSlim[] _gates = [.. Enumerable.Range(0, GateCount).Select(_ => new SemaphoreSlim(1, 1))];
 
+    /// <summary>
+    /// Abre la cuenta del usuario. El id se deriva del usuario (una cuenta por usuario) y la operacion es idempotente:
+    /// abrir dos veces, o dos peticiones a la vez, deja una sola cuenta y devuelve el mismo id.
+    /// </summary>
     public async Task<Guid> OpenAccountAsync(Guid userId, CancellationToken ct = default)
     {
-        var accountId = Guid.CreateVersion7();
-        var account = WalletAccount.Open(accountId, userId, clock.GetUtcNow());
+        var accountId = PlayerIds.WalletAccountFor(userId);
 
-        await using var session = store.LightweightSession();
-        session.Events.StartStream(accountId, account.UncommittedEvents.ToArray<object>());
-        await session.SaveChangesAsync(ct);
+        await using (var read = store.QuerySession())
+        {
+            if (await read.Events.FetchStreamStateAsync(accountId, ct) is not null)
+            {
+                return accountId;
+            }
+        }
+
+        var account = WalletAccount.Open(accountId, userId, clock.GetUtcNow());
+        try
+        {
+            await using var session = store.LightweightSession();
+            session.Events.StartStream(accountId, account.UncommittedEvents.ToArray<object>());
+            await session.SaveChangesAsync(ct);
+        }
+        catch (Exception ex) when (IsConcurrencyConflict(ex) || IsStreamCollision(ex))
+        {
+            // Otra peticion la abrio en el mismo instante: la cuenta ya existe, que es lo que se queria.
+        }
+
         return accountId;
     }
 
@@ -200,6 +220,21 @@ public sealed class WalletService(
 
     private static TimeSpan BackoffFor(int attempt) =>
         TimeSpan.FromMilliseconds(Random.Shared.Next(5, 20) * Math.Min(attempt, 8));
+
+    private static bool IsStreamCollision(Exception ex)
+    {
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is JasperFx.Events.ExistingStreamIdCollisionException
+                or Marten.Exceptions.ExistingStreamIdCollisionException
+                or PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static bool IsConcurrencyConflict(Exception ex)
     {

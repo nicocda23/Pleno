@@ -6,4 +6,14 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Marten" Version="9.47.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Casino.Contracts\Casino.Contracts.csproj" />
+    <ProjectReference Include="..\..\Casino.BuildingBlocks\Casino.BuildingBlocks.csproj" />
+  </ItemGroup>
+
 </Project>

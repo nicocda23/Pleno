@@ -1,6 +1,7 @@
 using Casino.Contracts;
 using Casino.Modules.Games.Application;
 using Casino.Modules.Games.Infrastructure;
+using Casino.Modules.Users.Infrastructure;
 using Casino.Modules.Wallet.Application;
 using Casino.Modules.Wallet.Infrastructure;
 using JasperFx;
@@ -22,6 +23,8 @@ internal static class CasinoInfrastructure
     public const string WalletEventsExchange = "wallet.events";
     public const string GamesWalletEventsQueue = "games.wallet-events";
     public const string RealtimeWalletEventsQueue = "realtime.wallet-events";
+    public const string UsersEventsExchange = "users.events";
+    public const string WalletUserEventsQueue = "wallet.user-events";
 
     public static WebApplicationBuilder AddCasinoInfrastructure(this WebApplicationBuilder builder)
     {
@@ -36,6 +39,7 @@ internal static class CasinoInfrastructure
                 options.AutoCreateSchemaObjects = AutoCreate.CreateOrUpdate;
                 WalletMartenConfiguration.Register(options);
                 GamesMartenConfiguration.Register(options);
+                UsersMartenConfiguration.Register(options);
                 return options;
             })
             .UseLightweightSessions()
@@ -90,5 +94,14 @@ internal static class CasinoInfrastructure
         options.PublishMessage<StakeReleased>().ToRabbitExchange(WalletEventsExchange);
         options.PublishMessage<StakeSettlementRejected>().ToRabbitExchange(WalletEventsExchange);
         options.PublishMessage<BalanceChanged>().ToRabbitExchange(WalletEventsExchange);
+
+        // Hechos de usuarios: la Wallet abre la cuenta cuando entra un jugador nuevo.
+        broker.DeclareExchange(UsersEventsExchange, exchange =>
+        {
+            exchange.ExchangeType = ExchangeType.Fanout;
+            exchange.BindQueue(WalletUserEventsQueue);
+        });
+        options.PublishMessage<UserRegistered>().ToRabbitExchange(UsersEventsExchange);
+        options.ListenToRabbitQueue(WalletUserEventsQueue).UseDurableInbox();
     }
 }

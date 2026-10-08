@@ -118,7 +118,7 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 - [ ] Tragamonedas con tabla de pagos configurable
 - [ ] Historial de jugadas y movimientos
 - [ ] Animaciones de premios, sonido y modo oscuro
-- [ ] Login con Keycloak o Entra External ID
+- [ ] Login con Keycloak o Entra External ID (backend hecho: Keycloak, tokens, roles y alta automática; falta el login en el front)
 
 ### Fase 4 — Distribuir y endurecer (2 semanas)
 
