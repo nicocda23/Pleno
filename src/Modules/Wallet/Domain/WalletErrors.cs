@@ -2,6 +2,7 @@ namespace Casino.Modules.Wallet.Domain;
 
 public enum WalletError
 {
+    AccountNotFound,
     InvalidAmount,
     InvalidIdempotencyKey,
     InsufficientFunds,
