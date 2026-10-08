@@ -5,6 +5,7 @@ public enum WalletError
     AccountNotFound,
     InvalidAmount,
     InvalidIdempotencyKey,
+    IdempotencyKeyReused,
     InsufficientFunds,
     ReservationAlreadyExists,
     ReservationNotFound,

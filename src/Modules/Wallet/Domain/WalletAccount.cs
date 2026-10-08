@@ -12,8 +12,8 @@ public sealed class WalletAccount
     private const int MaxIdempotencyKeyLength = 128;
 
     private readonly List<WalletEvent> _uncommitted = [];
-    private readonly Dictionary<string, Guid> _processedKeys = new(StringComparer.Ordinal);
-    private readonly Dictionary<Guid, LedgerEvent> _ledger = [];
+    private readonly Dictionary<string, ProcessedKey> _processedKeys = new(StringComparer.Ordinal);
+    private readonly Dictionary<Guid, LedgerRecord> _ledger = [];
     private readonly Dictionary<Guid, long> _openReservations = [];
     private readonly HashSet<Guid> _knownReservations = [];
     private readonly HashSet<Guid> _reversed = [];
@@ -57,11 +57,64 @@ public sealed class WalletAccount
         return account;
     }
 
+    /// <summary>Reconstruye la cuenta desde un snapshot y los eventos posteriores a su version.</summary>
+    public static WalletAccount Restore(WalletSnapshot snapshot, IEnumerable<WalletEvent> eventsAfterSnapshot)
+    {
+        var account = new WalletAccount
+        {
+            Id = snapshot.Id,
+            UserId = snapshot.UserId,
+            Available = snapshot.Available,
+            Reserved = snapshot.Reserved,
+            Version = snapshot.Version,
+        };
+
+        foreach (var (key, processed) in snapshot.ProcessedKeys)
+        {
+            account._processedKeys[key] = processed;
+        }
+
+        foreach (var record in snapshot.Ledger)
+        {
+            account._ledger[record.TransactionId] = record;
+        }
+
+        foreach (var (reservationId, stake) in snapshot.OpenReservations)
+        {
+            account._openReservations[reservationId] = stake;
+        }
+
+        account._knownReservations.UnionWith(snapshot.KnownReservations);
+        account._reversed.UnionWith(snapshot.Reversed);
+
+        foreach (var @event in eventsAfterSnapshot)
+        {
+            account.Apply(@event);
+        }
+
+        return account;
+    }
+
+    public WalletSnapshot ToSnapshot() => new()
+    {
+        Id = Id,
+        UserId = UserId,
+        Available = Available,
+        Reserved = Reserved,
+        Version = Version,
+        ProcessedKeys = new Dictionary<string, ProcessedKey>(_processedKeys, StringComparer.Ordinal),
+        Ledger = [.. _ledger.Values],
+        OpenReservations = new Dictionary<Guid, long>(_openReservations),
+        KnownReservations = [.. _knownReservations],
+        Reversed = [.. _reversed],
+    };
+
     public void MarkCommitted() => _uncommitted.Clear();
 
     public OperationOutcome Credit(string idempotencyKey, long amount, DateTimeOffset now)
     {
-        if (TryReplay(idempotencyKey, out var replay))
+        var fingerprint = $"credit|{amount}";
+        if (TryReplay(idempotencyKey, fingerprint, out var replay))
         {
             return replay;
         }
@@ -72,13 +125,14 @@ public sealed class WalletAccount
             new Entry(LedgerAccountRef.House, -amount),
             new Entry(LedgerAccountRef.Player(UserId), amount));
 
-        Emit(new ChipsCredited(transactionId, idempotencyKey, entries, now, amount));
+        Emit(new ChipsCredited(transactionId, idempotencyKey, fingerprint, entries, now, amount));
         return new OperationOutcome(transactionId, false);
     }
 
     public OperationOutcome Reserve(string idempotencyKey, Guid reservationId, long stake, DateTimeOffset now)
     {
-        if (TryReplay(idempotencyKey, out var replay))
+        var fingerprint = $"reserve|{reservationId:N}|{stake}";
+        if (TryReplay(idempotencyKey, fingerprint, out var replay))
         {
             return replay;
         }
@@ -99,14 +153,15 @@ public sealed class WalletAccount
             new Entry(LedgerAccountRef.Player(UserId), -stake),
             new Entry(LedgerAccountRef.Reserve(UserId), stake));
 
-        Emit(new BetReserved(transactionId, idempotencyKey, entries, now, reservationId, stake));
+        Emit(new BetReserved(transactionId, idempotencyKey, fingerprint, entries, now, reservationId, stake));
         return new OperationOutcome(transactionId, false);
     }
 
     /// <summary>Liquida una apuesta abierta. <paramref name="payout"/> es el premio total (0 si pierde).</summary>
     public OperationOutcome Settle(string idempotencyKey, Guid reservationId, long payout, DateTimeOffset now)
     {
-        if (TryReplay(idempotencyKey, out var replay))
+        var fingerprint = $"settle|{reservationId:N}|{payout}";
+        if (TryReplay(idempotencyKey, fingerprint, out var replay))
         {
             return replay;
         }
@@ -129,14 +184,15 @@ public sealed class WalletAccount
                 new Entry(LedgerAccountRef.House, -payout),
                 new Entry(LedgerAccountRef.Player(UserId), payout));
 
-        Emit(new BetSettled(transactionId, idempotencyKey, entries, now, reservationId, stake, payout));
+        Emit(new BetSettled(transactionId, idempotencyKey, fingerprint, entries, now, reservationId, stake, payout));
         return new OperationOutcome(transactionId, false);
     }
 
     /// <summary>Devuelve al jugador las fichas de una reserva abierta (la jugada se cancelo o expiro).</summary>
     public OperationOutcome Release(string idempotencyKey, Guid reservationId, DateTimeOffset now)
     {
-        if (TryReplay(idempotencyKey, out var replay))
+        var fingerprint = $"release|{reservationId:N}";
+        if (TryReplay(idempotencyKey, fingerprint, out var replay))
         {
             return replay;
         }
@@ -147,14 +203,15 @@ public sealed class WalletAccount
             new Entry(LedgerAccountRef.Reserve(UserId), -stake),
             new Entry(LedgerAccountRef.Player(UserId), stake));
 
-        Emit(new ReservationReleased(transactionId, idempotencyKey, entries, now, reservationId, stake));
+        Emit(new ReservationReleased(transactionId, idempotencyKey, fingerprint, entries, now, reservationId, stake));
         return new OperationOutcome(transactionId, false);
     }
 
     /// <summary>Revierte una transaccion agregando el contraasiento. Nunca borra ni edita historia.</summary>
     public OperationOutcome Reverse(string idempotencyKey, Guid transactionIdToReverse, DateTimeOffset now)
     {
-        if (TryReplay(idempotencyKey, out var replay))
+        var fingerprint = $"reverse|{transactionIdToReverse:N}";
+        if (TryReplay(idempotencyKey, fingerprint, out var replay))
         {
             return replay;
         }
@@ -164,7 +221,7 @@ public sealed class WalletAccount
             throw new WalletDomainException(WalletError.TransactionNotFound, $"No existe la transaccion {transactionIdToReverse}.");
         }
 
-        if (original is OperationReversed)
+        if (original.Kind == LedgerKind.Reversal)
         {
             throw new WalletDomainException(WalletError.ReversalNotAllowed, "No se puede revertir una reversa.");
         }
@@ -174,7 +231,7 @@ public sealed class WalletAccount
             throw new WalletDomainException(WalletError.AlreadyReversed, "La transaccion ya fue revertida.");
         }
 
-        if (original is BetReserved reserved && !_openReservations.ContainsKey(reserved.ReservationId))
+        if (original.Kind == LedgerKind.Reserve && !_openReservations.ContainsKey(original.ReservationId!.Value))
         {
             throw new WalletDomainException(
                 WalletError.ReversalNotAllowed,
@@ -189,7 +246,7 @@ public sealed class WalletAccount
         }
 
         var transactionId = NewTransactionId();
-        Emit(new OperationReversed(transactionId, idempotencyKey, negated, now, transactionIdToReverse));
+        Emit(new OperationReversed(transactionId, idempotencyKey, fingerprint, negated, now, transactionIdToReverse));
         return new OperationOutcome(transactionId, false);
     }
 
@@ -203,7 +260,7 @@ public sealed class WalletAccount
         }
     }
 
-    private bool TryReplay(string idempotencyKey, out OperationOutcome outcome)
+    private bool TryReplay(string idempotencyKey, string fingerprint, out OperationOutcome outcome)
     {
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > MaxIdempotencyKeyLength)
         {
@@ -212,9 +269,16 @@ public sealed class WalletAccount
                 $"La IdempotencyKey es obligatoria y de hasta {MaxIdempotencyKeyLength} caracteres.");
         }
 
-        if (_processedKeys.TryGetValue(idempotencyKey, out var transactionId))
+        if (_processedKeys.TryGetValue(idempotencyKey, out var processed))
         {
-            outcome = new OperationOutcome(transactionId, true);
+            if (!string.Equals(processed.Fingerprint, fingerprint, StringComparison.Ordinal))
+            {
+                throw new WalletDomainException(
+                    WalletError.IdempotencyKeyReused,
+                    "La IdempotencyKey ya se uso con otro contenido.");
+            }
+
+            outcome = new OperationOutcome(processed.TransactionId, true);
             return true;
         }
 
@@ -281,8 +345,8 @@ public sealed class WalletAccount
     private void ApplyLedger(LedgerEvent ledger)
     {
         (Available, Reserved) = Project(ledger.Entries);
-        _processedKeys[ledger.IdempotencyKey] = ledger.TransactionId;
-        _ledger[ledger.TransactionId] = ledger;
+        _processedKeys[ledger.IdempotencyKey] = new ProcessedKey(ledger.TransactionId, ledger.Fingerprint);
+        _ledger[ledger.TransactionId] = ToRecord(ledger);
 
         switch (ledger)
         {
@@ -306,21 +370,27 @@ public sealed class WalletAccount
         }
     }
 
-    private void ApplyReversalEffects(LedgerEvent original)
+    private void ApplyReversalEffects(LedgerRecord original)
     {
-        switch (original)
+        switch (original.Kind)
         {
-            case BetReserved reserved:
-                _openReservations.Remove(reserved.ReservationId);
+            case LedgerKind.Reserve:
+                _openReservations.Remove(original.ReservationId!.Value);
                 break;
 
-            case BetSettled settled:
-                _openReservations[settled.ReservationId] = settled.Stake;
-                break;
-
-            case ReservationReleased released:
-                _openReservations[released.ReservationId] = released.Stake;
+            case LedgerKind.Settle or LedgerKind.Release:
+                _openReservations[original.ReservationId!.Value] = original.Stake;
                 break;
         }
     }
+
+    private static LedgerRecord ToRecord(LedgerEvent ledger) => ledger switch
+    {
+        ChipsCredited => new LedgerRecord(ledger.TransactionId, LedgerKind.Credit, ledger.Entries, null, 0),
+        BetReserved r => new LedgerRecord(ledger.TransactionId, LedgerKind.Reserve, ledger.Entries, r.ReservationId, r.Stake),
+        BetSettled s => new LedgerRecord(ledger.TransactionId, LedgerKind.Settle, ledger.Entries, s.ReservationId, s.Stake),
+        ReservationReleased r => new LedgerRecord(ledger.TransactionId, LedgerKind.Release, ledger.Entries, r.ReservationId, r.Stake),
+        OperationReversed => new LedgerRecord(ledger.TransactionId, LedgerKind.Reversal, ledger.Entries, null, 0),
+        _ => throw new InvalidOperationException($"Evento de ledger desconocido: {ledger.GetType().Name}"),
+    };
 }

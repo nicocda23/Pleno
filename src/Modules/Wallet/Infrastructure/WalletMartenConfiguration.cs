@@ -42,6 +42,8 @@ public sealed class IdempotencyRecord
 
     public required Guid TransactionId { get; init; }
 
+    public required string Fingerprint { get; init; }
+
     public required DateTimeOffset RecordedAt { get; init; }
 
     public static string BuildId(Guid accountId, string key) => $"{accountId:N}:{key}";

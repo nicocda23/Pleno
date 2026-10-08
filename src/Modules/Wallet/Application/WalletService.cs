@@ -1,17 +1,32 @@
 using System.Net.Sockets;
 using Casino.Modules.Wallet.Domain;
 using Casino.Modules.Wallet.Infrastructure;
-using Marten;
 using JasperFx;
 using JasperFx.Events;
+using Marten;
 using Marten.Exceptions;
 using Npgsql;
 
 namespace Casino.Modules.Wallet.Application;
 
-public sealed class WalletService(IDocumentStore store, TimeProvider clock, int maxAttempts = WalletService.DefaultMaxAttempts)
+/// <summary>Saldo reconstruido a una fecha, a partir de los eventos (nunca de snapshots).</summary>
+public sealed record BalanceAtDate(
+    Guid AccountId,
+    DateTimeOffset AsOf,
+    long Available,
+    long Reserved,
+    long Total,
+    long EventsApplied);
+
+public sealed class WalletService(
+    IDocumentStore store,
+    TimeProvider clock,
+    int maxAttempts = WalletService.DefaultMaxAttempts,
+    int snapshotEvery = WalletService.DefaultSnapshotEvery)
 {
     public const int DefaultMaxAttempts = 20;
+    public const int DefaultSnapshotEvery = 50;
+
     private const int GateCount = 256;
 
     // Compuertas por cuenta (striping): serializan las operaciones de una misma cuenta dentro de este proceso
@@ -51,6 +66,34 @@ public sealed class WalletService(IDocumentStore store, TimeProvider clock, int 
     }
 
     /// <summary>
+    /// Auditoria: reconstruye el saldo aplicando solo los eventos ocurridos hasta <paramref name="asOf"/> (inclusive).
+    /// Ignora los snapshots a proposito: se recalcula desde la historia. Devuelve null si la cuenta aun no existia.
+    /// </summary>
+    public async Task<BalanceAtDate?> GetBalanceAtAsync(Guid accountId, DateTimeOffset asOf, CancellationToken ct = default)
+    {
+        await using var session = store.QuerySession();
+        var stream = await session.Events.FetchStreamAsync(accountId, token: ct);
+        if (stream.Count == 0)
+        {
+            throw new WalletDomainException(WalletError.AccountNotFound, $"No existe la cuenta {accountId}.");
+        }
+
+        var history = stream
+            .Select(e => e.Data)
+            .OfType<WalletEvent>()
+            .TakeWhile(e => e.OccurredAt <= asOf)
+            .ToList();
+
+        if (history.Count == 0)
+        {
+            return null;
+        }
+
+        var account = WalletAccount.Rehydrate(history);
+        return new BalanceAtDate(accountId, asOf, account.Available, account.Reserved, account.Available + account.Reserved, history.Count);
+    }
+
+    /// <summary>
     /// Carga, decide, y guarda con concurrencia optimista. Si otro escribio primero (o la conexion fallo),
     /// recarga y reintenta con la MISMA IdempotencyKey, asi un commit incierto nunca duplica la operacion.
     /// </summary>
@@ -83,8 +126,15 @@ public sealed class WalletService(IDocumentStore store, TimeProvider clock, int 
                         AccountId = accountId,
                         Key = ledger.IdempotencyKey,
                         TransactionId = ledger.TransactionId,
+                        Fingerprint = ledger.Fingerprint,
                         RecordedAt = ledger.OccurredAt,
                     });
+                }
+
+                if (snapshotEvery > 0 && account.Version / snapshotEvery > loadedVersion / snapshotEvery)
+                {
+                    // Mismo commit que los eventos: el snapshot nunca queda adelantado ni atrasado respecto del stream.
+                    session.Store(account.ToSnapshot());
                 }
 
                 await session.SaveChangesAsync(ct);
@@ -105,13 +155,17 @@ public sealed class WalletService(IDocumentStore store, TimeProvider clock, int 
 
     private static async Task<WalletAccount> LoadAsync(IQuerySession session, Guid accountId, CancellationToken ct)
     {
-        var stream = await session.Events.FetchStreamAsync(accountId, token: ct);
-        if (stream.Count == 0)
+        var snapshot = await session.LoadAsync<WalletSnapshot>(accountId, ct);
+        var fromVersion = snapshot is null ? 0 : snapshot.Version + 1;
+
+        var tail = await session.Events.FetchStreamAsync(accountId, fromVersion: fromVersion, token: ct);
+        if (snapshot is null && tail.Count == 0)
         {
             throw new WalletDomainException(WalletError.AccountNotFound, $"No existe la cuenta {accountId}.");
         }
 
-        return WalletAccount.Rehydrate(stream.Select(e => e.Data).OfType<WalletEvent>());
+        var events = tail.Select(e => e.Data).OfType<WalletEvent>();
+        return snapshot is null ? WalletAccount.Rehydrate(events) : WalletAccount.Restore(snapshot, events);
     }
 
     private static TimeSpan BackoffFor(int attempt) =>
