@@ -94,13 +94,13 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 
 ### Fase 1 — Wallet sólida (1 a 2 semanas)
 
-- [ ] Modelo de cuentas y asientos de partida doble
-- [ ] Operaciones: acreditar, reservar, liquidar, liberar reserva, revertir
-- [ ] IdempotencyKey con índice único y respuesta reproducible
-- [ ] Concurrencia optimista por cuenta
-- [ ] Ledger como Event Stream con Marten y snapshots
-- [ ] Test de carga concurrente: 1.000 apuestas en paralelo y el saldo cierra exacto
-- [ ] Endpoint de auditoría: reconstruir el saldo de una cuenta a cualquier fecha
+- [x] Modelo de cuentas y asientos de partida doble
+- [x] Operaciones: acreditar, reservar, liquidar, liberar reserva, revertir
+- [x] IdempotencyKey con índice único y respuesta reproducible
+- [x] Concurrencia optimista por cuenta
+- [x] Ledger como Event Stream con Marten y snapshots
+- [x] Test de carga concurrente: 1.000 apuestas en paralelo y el saldo cierra exacto
+- [x] Endpoint de auditoría: reconstruir el saldo de una cuenta a cualquier fecha
 
 ### Fase 2 — Primer juego y tiempo real (1 a 2 semanas)
 
