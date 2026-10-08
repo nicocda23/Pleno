@@ -10,6 +10,11 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Marten" Version="9.47.0" />
+    <PackageReference Include="WolverineFx.Marten" Version="6.48.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Casino.Contracts\Casino.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

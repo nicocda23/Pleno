@@ -65,7 +65,7 @@ public sealed class PostgresFixture : IAsyncLifetime
 }
 
 [CollectionDefinition(Name)]
-public sealed class WalletDbDefinition : ICollectionFixture<PostgresFixture>
+public sealed class WalletDbDefinition : ICollectionFixture<PostgresFixture>, ICollectionFixture<RabbitMqFixture>
 {
     public const string Name = "wallet-db";
 }

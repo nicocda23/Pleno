@@ -4,7 +4,7 @@ using Casino.Modules.Wallet.Api;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
-builder.Services.AddCasinoStore();
+builder.AddCasinoInfrastructure();
 builder.Services.AddWalletModule();
 builder.Services.AddGamesModule();
 
