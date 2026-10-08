@@ -113,12 +113,12 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 
 ### Fase 3 — Frontend llamativo (2 semanas)
 
-- [ ] Lobby con catálogo de juegos y saldo en vivo
+- [x] Lobby con catálogo de juegos y saldo en vivo
 - [ ] Ruleta animada con PixiJS
 - [ ] Tragamonedas con tabla de pagos configurable
-- [ ] Historial de jugadas y movimientos
-- [ ] Animaciones de premios, sonido y modo oscuro
-- [ ] Login con Keycloak o Entra External ID (backend hecho: Keycloak, tokens, roles y alta automática; falta el login en el front)
+- [ ] Historial de jugadas y movimientos (jugadas hechas, con verificación; faltan los movimientos de saldo)
+- [ ] Animaciones de premios, sonido y modo oscuro (modo oscuro hecho; faltan animaciones de premios y sonido)
+- [x] Login con Keycloak o Entra External ID (Keycloak)
 
 ### Fase 4 — Distribuir y endurecer (2 semanas)
 

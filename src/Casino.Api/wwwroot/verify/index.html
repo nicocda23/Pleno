@@ -32,7 +32,7 @@
 <body>
   <main>
     <h1>Verificar una jugada</h1>
-    <p class="lead">Todo se calcula en tu navegador: nada de lo que escribas sale de esta pagina. Necesitas la server seed
+    <p class="lead">Todo se calcula en tu navegador: nada de lo que escribas sale de esta página. Necesitás la server seed
       <strong>revelada</strong> (se muestra al rotar tus seeds).</p>
 
     <form id="form" autocomplete="off">
@@ -53,7 +53,7 @@
         </div>
       </div>
 
-      <label for="claimed">Numero que salio <small>(0 a 36)</small></label>
+      <label for="claimed">Número que salió <small>(0 a 36)</small></label>
       <input id="claimed" type="number" min="0" max="36" step="1" required>
 
       <button type="submit">Verificar</button>
@@ -63,14 +63,13 @@
   </main>
 
   <script type="module">
-    import { verifyRound } from "./verify.js";
+    import { parsePrefill, verifyRound } from "./verify.js";
 
     const form = document.getElementById("form");
     const result = document.getElementById("result");
     const escapeHtml = (text) => text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
+    async function run() {
       const input = {
         commitment: document.getElementById("commitment").value.trim(),
         serverSeed: document.getElementById("serverSeed").value.trim(),
@@ -82,14 +81,30 @@
       const mark = (ok) => (ok ? '<span class="ok">&#10003; Correcto</span>' : '<span class="bad">&#10007; No coincide</span>');
       result.hidden = false;
       result.innerHTML = `
-        <h2>${check.ok ? '<span class="ok">La jugada es legitima</span>' : '<span class="bad">La jugada NO se pudo verificar</span>'}</h2>
+        <h2>${check.ok ? '<span class="ok">La jugada es legítima</span>' : '<span class="bad">La jugada NO se pudo verificar</span>'}</h2>
         <ol>
-          <li><strong>La seed revelada es la que se comprometio:</strong> ${mark(check.commitmentOk)}<br>
+          <li><strong>La seed revelada es la que se comprometió:</strong> ${mark(check.commitmentOk)}<br>
             <small>SHA-256 de la seed: <code>${escapeHtml(check.computedCommitment)}</code></small></li>
-          <li><strong>El numero recalculado coincide:</strong> ${mark(check.numberOk)}<br>
+          <li><strong>El número recalculado coincide:</strong> ${mark(check.numberOk)}<br>
             <small>Recalculado: <strong>${check.recomputed}</strong> &middot; informado: <strong>${input.claimedNumber}</strong></small></li>
         </ol>`;
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void run();
     });
+
+    // Si llegas desde el historial del casino, los datos vienen en la URL: se completan y se verifica de inmediato.
+    const prefill = parsePrefill(window.location.search);
+    if (prefill) {
+      document.getElementById("commitment").value = prefill.commitment;
+      document.getElementById("serverSeed").value = prefill.serverSeed;
+      document.getElementById("clientSeed").value = prefill.clientSeed;
+      document.getElementById("nonce").value = prefill.nonce;
+      document.getElementById("claimed").value = prefill.claimedNumber;
+      void run();
+    }
   </script>
 </body>
 </html>

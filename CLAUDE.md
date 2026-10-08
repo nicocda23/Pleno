@@ -9,6 +9,7 @@ Laboratorio de arquitectura distribuida en .NET. Ver `README.md` y `docs/PLAN.md
 - Levantar todo: `aspire run` (requiere Docker Desktop corriendo)
 - Build: `dotnet build Casino.slnx`
 - Tests: `dotnet test Casino.slnx`
+- Front (`web/`): `npm --prefix web run dev` · `test` · `lint` · `build` · `e2e` (el e2e necesita `aspire start`). Ver `docs/frontend.md`.
 
 ## Reglas
 - Ramas siempre desde `dev`; `main` solo recibe merges de `dev`. Commits convencionales (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
