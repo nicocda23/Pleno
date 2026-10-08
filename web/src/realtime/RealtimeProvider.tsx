@@ -5,7 +5,7 @@ import { queryKeys, useAccount } from "../api/hooks";
 import type { BalanceNotice, RoundClosedNotice } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { config } from "../config";
-import { balanceReducer, initialBalance, type BalanceState } from "./balance";
+import { balanceReducer, initialBalance, type BalanceAction, type BalanceState } from "./balance";
 
 export type ConnectionState = "connecting" | "connected" | "reconnecting" | "disconnected";
 
@@ -38,6 +38,11 @@ export interface RealtimeApi {
   connection: ConnectionState;
   /** Se llama cada vez que una ronda termina. Devuelve la funcion para dejar de escuchar. */
   onRoundClosed: (listener: (notice: RoundClosedNotice) => void) => () => void;
+  /**
+   * Congela el saldo que ve el jugador (los avisos y el estado por HTTP se guardan en orden) hasta llamar a la funcion devuelta.
+   * Sirve para no adelantar el resultado de una animacion: el saldo cambia recien cuando la bola se detiene.
+   */
+  holdBalance: () => () => void;
 }
 
 const RealtimeContext = createContext<RealtimeApi | null>(null);
@@ -46,7 +51,19 @@ export function RealtimeProvider({ children, connectionFactory = defaultConnecti
   const auth = useAuth();
   const queryClient = useQueryClient();
   const account = useAccount();
-  const [balance, dispatch] = useReducer(balanceReducer, initialBalance);
+  const [balance, rawDispatch] = useReducer(balanceReducer, initialBalance);
+  const held = useRef(0);
+  const buffered = useRef<BalanceAction[]>([]);
+  const dispatch = useCallback((action: BalanceAction) => {
+    if (action.type === "reset") {
+      buffered.current = [];
+      rawDispatch(action);
+    } else if (held.current > 0) {
+      buffered.current.push(action);
+    } else {
+      rawDispatch(action);
+    }
+  }, []);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const listeners = useRef(new Set<(notice: RoundClosedNotice) => void>());
   const { status, getAccessToken } = auth;
@@ -54,7 +71,7 @@ export function RealtimeProvider({ children, connectionFactory = defaultConnecti
   // Estado completo por HTTP: es la base. Los avisos en vivo se aplican encima, respetando la version.
   useEffect(() => {
     if (account.data) dispatch({ type: "seed", account: account.data });
-  }, [account.data]);
+  }, [account.data, dispatch]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -96,7 +113,7 @@ export function RealtimeProvider({ children, connectionFactory = defaultConnecti
       disposed = true;
       void hub.stop();
     };
-  }, [status, getAccessToken, connectionFactory, queryClient]);
+  }, [status, getAccessToken, connectionFactory, queryClient, dispatch]);
 
   const onRoundClosed = useCallback((listener: (notice: RoundClosedNotice) => void) => {
     listeners.current.add(listener);
@@ -105,7 +122,22 @@ export function RealtimeProvider({ children, connectionFactory = defaultConnecti
     };
   }, []);
 
-  const value = useMemo<RealtimeApi>(() => ({ balance, connection, onRoundClosed }), [balance, connection, onRoundClosed]);
+  const holdBalance = useCallback(() => {
+    held.current += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      held.current -= 1;
+      if (held.current === 0) {
+        const pending = buffered.current;
+        buffered.current = [];
+        pending.forEach((action) => rawDispatch(action));
+      }
+    };
+  }, []);
+
+  const value = useMemo<RealtimeApi>(() => ({ balance, connection, onRoundClosed, holdBalance }), [balance, connection, onRoundClosed, holdBalance]);
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;
 }
 

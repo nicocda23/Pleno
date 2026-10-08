@@ -1,4 +1,5 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { useRef } from "react";
 import { ApiError } from "../api/client";
 import { BalanceChip } from "../components/BalanceChip";
 import { fakeApi, FakeHub, renderApp } from "../test/harness";
@@ -122,5 +123,62 @@ describe("BalanceChip", () => {
 
     expect(screen.getByTestId("balance-value")).toHaveTextContent("—");
     await waitFor(() => expect(screen.getByTestId("balance-value")).toHaveTextContent("1.234"));
+  });
+});
+
+describe("holdBalance", () => {
+  function HoldProbe() {
+    const { balance, holdBalance } = useRealtime();
+    const releases = useRef<(() => void)[]>([]);
+    return (
+      <div>
+        <span data-testid="avail">{balance.ready ? balance.available : "loading"}</span>
+        <button onClick={() => releases.current.push(holdBalance())}>hold</button>
+        <button onClick={() => releases.current.shift()?.()}>release</button>
+      </div>
+    );
+  }
+
+  const setup = async () => {
+    const api = fakeApi({ "GET /wallet/me": () => account(2, 1000) });
+    const view = renderApp(<HoldProbe />, { api });
+    await waitFor(() => expect(screen.getByTestId("avail")).toHaveTextContent("1000"));
+    return view;
+  };
+
+  it("keeps the shown balance frozen while held and applies the notices in order on release", async () => {
+    const { hub } = await setup();
+
+    fireEvent.click(screen.getByText("hold"));
+    act(() => hub.emit("balanceChanged", { available: 900, reserved: 100, version: 3 }));
+    act(() => hub.emit("balanceChanged", { available: 1100, reserved: 0, version: 4 }));
+
+    expect(screen.getByTestId("avail")).toHaveTextContent("1000");
+
+    fireEvent.click(screen.getByText("release"));
+
+    expect(screen.getByTestId("avail")).toHaveTextContent("1100");
+  });
+
+  it("only releases when every hold is released", async () => {
+    const { hub } = await setup();
+
+    fireEvent.click(screen.getByText("hold"));
+    fireEvent.click(screen.getByText("hold"));
+    act(() => hub.emit("balanceChanged", { available: 700, reserved: 0, version: 3 }));
+    fireEvent.click(screen.getByText("release"));
+
+    expect(screen.getByTestId("avail")).toHaveTextContent("1000");
+
+    fireEvent.click(screen.getByText("release"));
+    expect(screen.getByTestId("avail")).toHaveTextContent("700");
+  });
+
+  it("applies live notices at once when nothing is held", async () => {
+    const { hub } = await setup();
+
+    act(() => hub.emit("balanceChanged", { available: 950, reserved: 0, version: 3 }));
+
+    expect(screen.getByTestId("avail")).toHaveTextContent("950");
   });
 });

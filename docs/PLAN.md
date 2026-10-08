@@ -114,7 +114,7 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 ### Fase 3 — Frontend llamativo (2 semanas)
 
 - [x] Lobby con catálogo de juegos y saldo en vivo
-- [ ] Ruleta animada con PixiJS
+- [x] Ruleta animada con PixiJS (tapete completo con 157 apuestas, rueda con bola que cae en el número que ya decidió el servidor)
 - [ ] Tragamonedas con tabla de pagos configurable
 - [ ] Historial de jugadas y movimientos (jugadas hechas, con verificación; faltan los movimientos de saldo)
 - [ ] Animaciones de premios, sonido y modo oscuro (modo oscuro hecho; faltan animaciones de premios y sonido)

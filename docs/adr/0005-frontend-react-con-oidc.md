@@ -35,3 +35,17 @@ navegador guarde secretos ni pueda inventar su identidad.
 - Los textos de la interfaz estan en español rioplatense (voseo) y con tildes; el codigo y sus comentarios, sin tildes por convencion del repo.
 - Un navegador real encontro un error (`parsePrefill is not defined`) que ninguna prueba unitaria veia: las pruebas de extremo a
   extremo son parte del trabajo, no un extra.
+
+## Anexo — Ruleta animada (paso 3b)
+- **La animación no decide nada.** El servidor ya sorteó el número; la rueda (`lib/wheel.ts`, un modelo matemático puro sin dibujo) solo hace
+  aterrizar la bola en ese casillero. PixiJS únicamente lee ángulos y dibuja, así la lógica se prueba sin navegador ni WebGL.
+- **Suspenso independiente del servidor:** la rueda empieza a girar al enviar la apuesta y no aterriza antes de un mínimo de giro,
+  aunque la respuesta llegue al instante; si el resultado tarda, sigue girando.
+- **No se adelanta el resultado:** `holdBalance()` en el `RealtimeProvider` congela el saldo (guarda los avisos y el estado HTTP, en orden)
+  hasta que la bola se detiene; recién ahí aparecen el saldo nuevo, el aviso emergente y el panel de resultado.
+- **Tapete generado y verificado:** `lib/board.ts` produce las 157 apuestas legales (37 plenos, 60 caballos, 12 calles, 2 tríos,
+  22 cuadros, 1 primeros cuatro, 11 seisenas, 12 exteriores) y una prueba comprueba que ninguna sería rechazada por la API.
+- **Una apuesta por tirada:** el backend crea una ronda (y un nonce) por apuesta. Varias apuestas en una misma tirada requieren
+  cambiar el modelo del servidor; queda como paso posterior (3c).
+- **Accesibilidad:** con "reducir movimiento" la rueda se asienta al instante; la rueda expone texto alternativo y `data-state`.
+- **Carga diferida:** PixiJS pesa mucho, así que la página de la ruleta se descarga recién al entrar a ella.
