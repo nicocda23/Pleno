@@ -29,9 +29,10 @@ public sealed class WalletService(
 
     private const int GateCount = 256;
 
-    // Compuertas por cuenta (striping): serializan las operaciones de una misma cuenta dentro de este proceso
-    // para no desperdiciar reintentos. La concurrencia optimista sigue siendo la garantia entre instancias.
-    private static readonly SemaphoreSlim[] Gates = [.. Enumerable.Range(0, GateCount).Select(_ => new SemaphoreSlim(1, 1))];
+    // Compuertas por cuenta (striping): serializan las operaciones de una misma cuenta dentro de ESTA instancia
+    // para no desperdiciar reintentos. Son por instancia a proposito: entre instancias la garantia es la
+    // concurrencia optimista de la base de datos.
+    private readonly SemaphoreSlim[] _gates = [.. Enumerable.Range(0, GateCount).Select(_ => new SemaphoreSlim(1, 1))];
 
     public async Task<Guid> OpenAccountAsync(Guid userId, CancellationToken ct = default)
     {
@@ -102,7 +103,7 @@ public sealed class WalletService(
         for (var attempt = 1; ; attempt++)
         {
             TimeSpan retryDelay;
-            var gate = Gates[(accountId.GetHashCode() & int.MaxValue) % GateCount];
+            var gate = _gates[(accountId.GetHashCode() & int.MaxValue) % GateCount];
             await gate.WaitAsync(ct);
             try
             {
@@ -142,6 +143,11 @@ public sealed class WalletService(
             }
             catch (Exception ex) when (attempt < maxAttempts && IsRetryable(ex) && !ct.IsCancellationRequested)
             {
+                WalletTelemetry.OperationRetries.Add(
+                    1,
+                    new KeyValuePair<string, object?>(
+                        WalletTelemetry.ReasonTag,
+                        IsConcurrencyConflict(ex) ? WalletTelemetry.ConflictReason : WalletTelemetry.TransientReason));
                 retryDelay = BackoffFor(attempt);
             }
             finally
@@ -171,15 +177,30 @@ public sealed class WalletService(
     private static TimeSpan BackoffFor(int attempt) =>
         TimeSpan.FromMilliseconds(Random.Shared.Next(5, 20) * Math.Min(attempt, 8));
 
-    /// <summary>Conflictos de version y fallos transitorios de conexion. Los errores de negocio nunca se reintentan.</summary>
-    private static bool IsRetryable(Exception ex)
+    private static bool IsConcurrencyConflict(Exception ex)
     {
         for (var current = ex; current is not null; current = current.InnerException)
         {
-            if (current is EventStreamUnexpectedMaxEventIdException
-                or ConcurrencyException
-                or DocumentAlreadyExistsException
-                or TimeoutException
+            if (current is EventStreamUnexpectedMaxEventIdException or ConcurrencyException or DocumentAlreadyExistsException)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Conflictos de version y fallos transitorios de conexion. Los errores de negocio nunca se reintentan.</summary>
+    private static bool IsRetryable(Exception ex)
+    {
+        if (IsConcurrencyConflict(ex))
+        {
+            return true;
+        }
+
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is TimeoutException
                 or IOException
                 or SocketException
                 or NpgsqlException { IsTransient: true })
