@@ -90,7 +90,8 @@ public static class TestAuth
         RabbitMqFixture? rabbit = null,
         int? welcomeChips = 0,
         Action<IWebHostBuilder>? customize = null,
-        bool testIssuer = true)
+        bool testIssuer = true,
+        string? redis = null)
     {
         ArgumentNullException.ThrowIfNull(db);
 
@@ -102,6 +103,11 @@ public static class TestAuth
             if (rabbit is not null)
             {
                 builder.UseSetting("ConnectionStrings:rabbitmq", rabbit.ConnectionString);
+            }
+
+            if (redis is not null)
+            {
+                builder.UseSetting("ConnectionStrings:redis", redis);
             }
 
             if (welcomeChips is { } chips)

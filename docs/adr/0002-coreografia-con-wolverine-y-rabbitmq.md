@@ -18,7 +18,7 @@ fichas aunque el broker o la base fallen en el peor momento.
   Si el commit falla no sale nada; si sale bien, el mensaje esta garantizado aunque RabbitMQ este caido.
 - **Inbox durable** en los listeners y consumidores **idempotentes**: la entrega es "al menos una vez" y cada orden deriva su
   `IdempotencyKey` de la apuesta (`reserve:{betId}`, `settle:{betId}`), asi un duplicado no tiene efecto.
-- **Topologia:** una cola por orden hacia un dueño (`wallet.commands`) y un exchange `fanout` para los hechos (`wallet.events`)
+- **Topologia (reemplazada en parte por el ADR 0004: un exchange por tema):** una cola por orden hacia un dueño (`wallet.commands`) y un exchange `fanout` para los hechos (`wallet.events`)
   con una cola por consumidor (`games.wallet-events`, `realtime.wallet-events`).
 
 ## Consecuencias

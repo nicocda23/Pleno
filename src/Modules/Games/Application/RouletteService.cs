@@ -173,6 +173,19 @@ public sealed partial class RouletteService(
         if (transition(round, clock.GetUtcNow()))
         {
             session.Store(round);
+
+            // El aviso de "ronda cerrada" sale en la misma transaccion que el cierre, y solo cuando la transicion
+            // realmente ocurre: una entrega duplicada no vuelve a avisar.
+            await using var outboxSession = outbox.Enroll(session);
+            await outboxSession.PublishAsync(new RoundClosed(
+                round.Id,
+                round.AccountId,
+                "Roulette",
+                round.Status.ToString(),
+                round.WinningNumber,
+                round.Stake,
+                round.Status == RoundStatus.Settled ? round.Payout ?? 0 : 0,
+                round.FailureReason));
             await session.SaveChangesAsync(ct);
         }
 

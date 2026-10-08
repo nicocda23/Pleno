@@ -21,9 +21,9 @@ namespace Casino.Integration.Tests.Wallet;
 [Collection(WalletDbDefinition.Name)]
 public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rabbit, ITestOutputHelper output) : IAsyncLifetime
 {
-    // La cola de juegos la consume el modulo Games; la de tiempo real todavia no tiene consumidor y acumula lo que llega al broker.
-    private const string GamesQueue = "games.wallet-events";
-    private const string RealtimeQueue = "realtime.wallet-events";
+    // Cola de auditoria sin consumidor, enlazada a los exchanges de la Wallet: acumula todo lo que llega al broker.
+    private const string StakeEvents = "wallet.stake-events";
+    private const string BalanceEvents = "wallet.balance-events";
 
     private WebApplicationFactory<Program> _factory = null!;
     private IHost _host = null!;
@@ -76,7 +76,8 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
     {
         var accountId = await FundedAccountAsync(1_000);
         var bet = Guid.NewGuid();
-        var depthBefore = await rabbit.QueueDepthAsync(RealtimeQueue);
+        var audit = await rabbit.CreateAuditQueueAsync(StakeEvents, BalanceEvents);
+        var depthBefore = await rabbit.QueueDepthAsync(audit);
 
         var session = await PublishTrackedAsync(new ReserveStake(bet, accountId, 100));
 
@@ -90,7 +91,7 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
         Assert.Equal((900L, 100L), (account.Available, account.Reserved));
 
         // El hecho llego de verdad al broker: la cola del consumidor tiene los dos mensajes nuevos.
-        Assert.True(await rabbit.QueueDepthAsync(RealtimeQueue) >= depthBefore + 2);
+        Assert.True(await rabbit.QueueDepthAsync(audit) >= depthBefore + 2);
     }
 
     [Fact]
@@ -189,7 +190,8 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
     {
         var accountId = await FundedAccountAsync(1_000);
         await TrackAsync(_ => Task.CompletedTask);
-        var depthBefore = await rabbit.QueueDepthAsync(RealtimeQueue);
+        var audit = await rabbit.CreateAuditQueueAsync(StakeEvents, BalanceEvents);
+        var depthBefore = await rabbit.QueueDepthAsync(audit);
         var bet = Guid.NewGuid();
 
         await rabbit.StopBrokerAsync();
@@ -213,7 +215,7 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
         {
             try
             {
-                depthAfter = await rabbit.QueueDepthAsync(RealtimeQueue);
+                depthAfter = await rabbit.QueueDepthAsync(audit);
                 if (depthAfter >= depthBefore + 2 && await PendingOutgoingAsync() == 0)
                 {
                     break;
@@ -227,7 +229,7 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
             await Task.Delay(1_000);
         }
 
-        output.WriteLine($"Cola {RealtimeQueue}: antes={depthBefore}, despues={depthAfter}");
+        output.WriteLine($"Cola de auditoria {audit}: antes={depthBefore}, despues={depthAfter}");
         Assert.True(depthAfter >= depthBefore + 2, "Los hechos no llegaron al broker tras recuperarse.");
         Assert.Equal(0, await PendingOutgoingAsync());
     }

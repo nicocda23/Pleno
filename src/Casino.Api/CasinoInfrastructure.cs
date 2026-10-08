@@ -1,6 +1,7 @@
 using Casino.Contracts;
 using Casino.Modules.Games.Application;
 using Casino.Modules.Games.Infrastructure;
+using Casino.Modules.Realtime.Application;
 using Casino.Modules.Users.Infrastructure;
 using Casino.Modules.Wallet.Application;
 using Casino.Modules.Wallet.Infrastructure;
@@ -18,12 +19,19 @@ internal static class CasinoInfrastructure
 {
     public const string SchemaName = "casino";
 
-    // Colas y exchanges de RabbitMQ.
+    // Ordenes hacia la Wallet: una cola con un solo dueño.
     public const string WalletCommandsQueue = "wallet.commands";
-    public const string WalletEventsExchange = "wallet.events";
+
+    // Un exchange por TEMA, con una cola por consumidor. Los handlers de Wolverine son globales a la aplicacion (no importa por
+    // que cola llega un mensaje), asi que cada cola recibe solo lo que su modulo maneja: si no, se ejecutarian dos veces.
+    public const string WalletStakeEventsExchange = "wallet.stake-events";
+    public const string WalletBalanceEventsExchange = "wallet.balance-events";
+    public const string GamesEventsExchange = "games.events";
+    public const string UsersEventsExchange = "users.events";
+
     public const string GamesWalletEventsQueue = "games.wallet-events";
     public const string RealtimeWalletEventsQueue = "realtime.wallet-events";
-    public const string UsersEventsExchange = "users.events";
+    public const string RealtimeGameEventsQueue = "realtime.game-events";
     public const string WalletUserEventsQueue = "wallet.user-events";
 
     public static WebApplicationBuilder AddCasinoInfrastructure(this WebApplicationBuilder builder)
@@ -51,6 +59,7 @@ internal static class CasinoInfrastructure
             options.ServiceName = "casino";
             options.Discovery.IncludeAssembly(typeof(WalletService).Assembly);
             options.Discovery.IncludeAssembly(typeof(FairnessService).Assembly);
+            options.Discovery.IncludeAssembly(typeof(PlayerNotifier).Assembly);
 
             // Inbox durable: los mensajes recibidos quedan registrados y no se procesan dos veces.
             // Outbox durable: lo que se envia queda guardado hasta que el broker lo confirma.
@@ -69,31 +78,44 @@ internal static class CasinoInfrastructure
     private static void ConfigureRabbitMq(WolverineOptions options, Uri rabbit)
     {
         var broker = options.UseRabbitMq(rabbit).AutoProvision();
+        options.UnknownMessageBehavior = UnknownMessageBehavior.LogOnly;
 
-        // Ordenes hacia la Wallet: una cola con un solo dueño.
+        // Ordenes hacia la Wallet.
         options.ListenToRabbitQueue(WalletCommandsQueue).UseDurableInbox();
         options.PublishMessage<ReserveStake>().ToRabbitQueue(WalletCommandsQueue);
         options.PublishMessage<RoundResolved>().ToRabbitQueue(WalletCommandsQueue);
         options.PublishMessage<ExpireReservation>().ToRabbitQueue(WalletCommandsQueue);
 
-        // Los juegos consumen los hechos de la Wallet. Cada cola del fanout recibe TODOS los hechos: cada consumidor ignora los que no le interesan.
-        options.ListenToRabbitQueue(GamesWalletEventsQueue).UseDurableInbox();
-        options.UnknownMessageBehavior = UnknownMessageBehavior.LogOnly;
-
-        // Hechos de la Wallet: pub/sub. Un exchange "fanout" copia cada hecho a la cola de cada consumidor,
-        // asi sumar un consumidor nuevo (por ejemplo, otro juego) no requiere tocar a la Wallet.
-        broker.DeclareExchange(WalletEventsExchange, exchange =>
+        // Hechos de la reserva y la liquidacion: los consumen los juegos.
+        broker.DeclareExchange(WalletStakeEventsExchange, exchange =>
         {
             exchange.ExchangeType = ExchangeType.Fanout;
             exchange.BindQueue(GamesWalletEventsQueue);
+        });
+        options.PublishMessage<StakeReserved>().ToRabbitExchange(WalletStakeEventsExchange);
+        options.PublishMessage<StakeRejected>().ToRabbitExchange(WalletStakeEventsExchange);
+        options.PublishMessage<StakeSettled>().ToRabbitExchange(WalletStakeEventsExchange);
+        options.PublishMessage<StakeReleased>().ToRabbitExchange(WalletStakeEventsExchange);
+        options.PublishMessage<StakeSettlementRejected>().ToRabbitExchange(WalletStakeEventsExchange);
+        options.ListenToRabbitQueue(GamesWalletEventsQueue).UseDurableInbox();
+
+        // Cambios de saldo: los consume el tiempo real para avisar al navegador.
+        broker.DeclareExchange(WalletBalanceEventsExchange, exchange =>
+        {
+            exchange.ExchangeType = ExchangeType.Fanout;
             exchange.BindQueue(RealtimeWalletEventsQueue);
         });
-        options.PublishMessage<StakeReserved>().ToRabbitExchange(WalletEventsExchange);
-        options.PublishMessage<StakeRejected>().ToRabbitExchange(WalletEventsExchange);
-        options.PublishMessage<StakeSettled>().ToRabbitExchange(WalletEventsExchange);
-        options.PublishMessage<StakeReleased>().ToRabbitExchange(WalletEventsExchange);
-        options.PublishMessage<StakeSettlementRejected>().ToRabbitExchange(WalletEventsExchange);
-        options.PublishMessage<BalanceChanged>().ToRabbitExchange(WalletEventsExchange);
+        options.PublishMessage<BalanceChanged>().ToRabbitExchange(WalletBalanceEventsExchange);
+        options.ListenToRabbitQueue(RealtimeWalletEventsQueue).UseDurableInbox();
+
+        // Rondas cerradas: las consume el tiempo real.
+        broker.DeclareExchange(GamesEventsExchange, exchange =>
+        {
+            exchange.ExchangeType = ExchangeType.Fanout;
+            exchange.BindQueue(RealtimeGameEventsQueue);
+        });
+        options.PublishMessage<RoundClosed>().ToRabbitExchange(GamesEventsExchange);
+        options.ListenToRabbitQueue(RealtimeGameEventsQueue).UseDurableInbox();
 
         // Hechos de usuarios: la Wallet abre la cuenta cuando entra un jugador nuevo.
         broker.DeclareExchange(UsersEventsExchange, exchange =>

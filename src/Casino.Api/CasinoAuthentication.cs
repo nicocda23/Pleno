@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Casino.BuildingBlocks;
+using Casino.Modules.Realtime.Api;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
@@ -32,6 +33,17 @@ internal static class CasinoAuthentication
                 options.TokenValidationParameters.RoleClaimType = ClaimTypes.Role;
                 options.Events = new JwtBearerEvents
                 {
+                    // Un navegador no puede poner cabeceras en un WebSocket: el token viaja en la query, pero SOLO para el hub.
+                    OnMessageReceived = context =>
+                    {
+                        if (context.Request.Path.StartsWithSegments(PlayerHub.Path, StringComparison.OrdinalIgnoreCase)
+                            && context.Request.Query["access_token"] is { Count: > 0 } token)
+                        {
+                            context.Token = token;
+                        }
+
+                        return Task.CompletedTask;
+                    },
                     OnTokenValidated = context =>
                     {
                         // Sin un "sub" valido no hay forma de identificar al jugador: el token no sirve.

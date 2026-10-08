@@ -35,3 +35,19 @@ public sealed record ExpireReservation(Guid BetId, Guid AccountId);
 
 /// <summary>Un jugador entro por primera vez. La Wallet abre su cuenta (el id se deriva del usuario) y le acredita las fichas de bienvenida.</summary>
 public sealed record UserRegistered(Guid UserId);
+
+// ---- Hechos que publican los juegos ----
+
+/// <summary>
+/// Una ronda termino (cobrada, rechazada o anulada). Lo consume el tiempo real para avisar al jugador.
+/// <paramref name="Status"/> es el nombre del estado final: Settled, Rejected o Voided.
+/// </summary>
+public sealed record RoundClosed(
+    Guid BetId,
+    Guid AccountId,
+    string Game,
+    string Status,
+    int? WinningNumber,
+    long Stake,
+    long Payout,
+    string? FailureReason);
