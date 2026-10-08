@@ -103,3 +103,69 @@ test("un max invalido se rechaza", async () => {
   await assert.rejects(() => stream.nextInt(2 ** 31), RangeError);
   await assert.rejects(() => stream.nextInt(1.5), RangeError);
 });
+
+// ---- Datos que llegan por la URL desde el historial del casino ----
+import { parsePrefill } from "../../src/Casino.Api/wwwroot/verify/verify.js";
+
+const HEX_A = "a".repeat(64);
+const HEX_B = "b".repeat(64);
+const url = (params) => `?${new URLSearchParams(params).toString()}`;
+const valid = { commitment: HEX_A, serverSeed: HEX_B, clientSeed: "mi-semilla", nonce: "7", claimed: "26" };
+
+test("la URL del historial se convierte en una jugada lista para verificar", () => {
+  assert.deepEqual(parsePrefill(url(valid)), { commitment: HEX_A, serverSeed: HEX_B, clientSeed: "mi-semilla", nonce: 7, claimedNumber: 26 });
+});
+
+test("el prefill acepta el compromiso en mayusculas y lo normaliza", () => {
+  assert.equal(parsePrefill(url({ ...valid, commitment: HEX_A.toUpperCase() })).commitment, HEX_A);
+});
+
+for (const [campo, valor] of [
+  ["commitment", "corto"],
+  ["serverSeed", "g".repeat(64)],
+  ["clientSeed", ""],
+  ["clientSeed", "x".repeat(65)],
+  ["nonce", "-1"],
+  ["nonce", "1.5"],
+  ["nonce", "abc"],
+  ["claimed", "37"],
+  ["claimed", "-3"],
+]) {
+  test(`el prefill se descarta entero si ${campo} es invalido (${JSON.stringify(valor).slice(0, 12)})`, () => {
+    assert.equal(parsePrefill(url({ ...valid, [campo]: valor })), null);
+  });
+}
+
+test("el prefill se descarta si falta cualquier dato", () => {
+  for (const campo of Object.keys(valid)) {
+    const { [campo]: _omitido, ...resto } = valid;
+    assert.equal(parsePrefill(url(resto)), null, `sin ${campo}`);
+  }
+  assert.equal(parsePrefill(""), null);
+});
+
+test("el prefill de una jugada legitima se verifica de punta a punta", async () => {
+  const prefill = parsePrefill(url({ commitment: COMMITMENT, serverSeed: SERVER_SEED, clientSeed: CLIENT_SEED, nonce: "0", claimed: "26" }));
+  assert.equal((await verifyRound(prefill)).ok, true);
+});
+
+// ---- La pagina HTML: todo lo que usa debe estar importado (un navegador real lo descubrio: "parsePrefill is not defined") ----
+import { readFileSync } from "node:fs";
+import * as verifyModule from "../../src/Casino.Api/wwwroot/verify/verify.js";
+
+test("la pagina importa todas las funciones del modulo que usa", () => {
+  const html = readFileSync(new URL("../../src/Casino.Api/wwwroot/verify/index.html", import.meta.url), "utf8");
+  const imported = new Set(
+    (html.match(/import\s*\{([^}]*)\}\s*from\s*"\.\/verify\.js"/)?.[1] ?? "").split(",").map((name) => name.trim()).filter(Boolean),
+  );
+
+  const script = html.slice(html.indexOf('<script type="module">'));
+  for (const name of Object.keys(verifyModule)) {
+    if (script.includes(`${name}(`)) {
+      assert.ok(imported.has(name), `la pagina llama a ${name}() pero no lo importa`);
+    }
+  }
+  for (const name of imported) {
+    assert.ok(name in verifyModule, `la pagina importa ${name}, que el modulo no exporta`);
+  }
+});

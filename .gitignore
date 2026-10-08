@@ -512,3 +512,8 @@ tests/load/results/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Playwright
+web/test-results/
+web/playwright-report/
+web/blob-report/

@@ -61,6 +61,33 @@ export async function rouletteNumber(serverSeed, clientSeed, nonce) {
 }
 
 /**
+ * Lee los datos de una jugada desde la URL (?commitment=&serverSeed=&clientSeed=&nonce=&claimed=). Es lo que arma el historial
+ * del casino para abrir esta pagina ya completa. Devuelve null si falta algo o algo no es valido: nunca se rellena a medias.
+ */
+export function parsePrefill(search) {
+  const params = new URLSearchParams(search);
+  const text = (name) => (params.get(name) ?? "").trim();
+  const whole = (name) => (/^\d+$/.test(text(name)) ? Number(text(name)) : null);
+
+  const commitment = text("commitment").toLowerCase();
+  const serverSeed = text("serverSeed");
+  const clientSeed = params.get("clientSeed") ?? "";
+  const nonce = whole("nonce");
+  const claimed = whole("claimed");
+
+  const valid =
+    /^[0-9a-f]{64}$/.test(commitment) &&
+    /^[0-9a-f]{64}$/.test(serverSeed) &&
+    clientSeed.length >= 1 &&
+    clientSeed.length <= 64 &&
+    nonce !== null &&
+    claimed !== null &&
+    claimed <= 36;
+
+  return valid ? { commitment, serverSeed, clientSeed, nonce, claimedNumber: claimed } : null;
+}
+
+/**
  * Verifica una jugada con datos publicos. Devuelve cada paso por separado para poder mostrarlo.
  * @param {{ commitment: string, serverSeed: string, clientSeed: string, nonce: number, claimedNumber: number }} round
  */

@@ -1,0 +1,48 @@
+import { ApiError } from "../api/client";
+import type { Round, RoundStatus } from "../api/types";
+
+/** Mensajes para el jugador, a partir del codigo estable (`title`) que devuelve la API. */
+const ERRORS: Record<string, string> = {
+  InsufficientFunds: "No te alcanzan las fichas para esa apuesta.",
+  InvalidBet: "Esa apuesta no es válida. Revisá la selección y el monto.",
+  InvalidIdempotencyKey: "No se pudo identificar la apuesta. Intentá de nuevo.",
+  BetKeyReused: "Esa apuesta ya se envió con otros datos. Intentá de nuevo.",
+  AccountNotFound: "Tu cuenta todavía se está preparando. Intentá en unos segundos.",
+  PendingBets: "Tenés apuestas sin resolver. Esperá a que terminen.",
+  NetworkError: "No hay conexión con el servidor. Revisá tu red e intentá de nuevo.",
+};
+
+export function errorMessage(error: unknown): string {
+  if (error instanceof ApiError) return ERRORS[error.title] ?? "Algo salió mal. Intentá de nuevo.";
+  return "Algo salió mal. Intentá de nuevo.";
+}
+
+const STATUS_LABELS: Record<RoundStatus, string> = {
+  Placed: "En curso",
+  Resolved: "Liquidando",
+  Settled: "Cobrada",
+  Rejected: "Rechazada",
+  Voided: "Anulada",
+};
+
+export const statusLabel = (status: RoundStatus) => STATUS_LABELS[status];
+
+/** Lo que paso con las fichas de una ronda, en una frase corta. */
+export function outcomeText(round: Pick<Round, "status" | "payout" | "stake">): string {
+  switch (round.status) {
+    case "Settled":
+      return (round.payout ?? 0) > 0 ? `Ganaste ${round.payout}` : `Perdiste ${round.stake}`;
+    case "Rejected":
+      return "No se jugó";
+    case "Voided":
+      return "Fichas devueltas";
+    default:
+      return "En curso";
+  }
+}
+
+/** Motivo (codigo estable) por el que una ronda no se jugo, en lenguaje del jugador. */
+export function failureMessage(reason: string | null): string {
+  if (!reason) return "La apuesta no se pudo jugar.";
+  return ERRORS[reason] ?? "La apuesta no se pudo jugar.";
+}
