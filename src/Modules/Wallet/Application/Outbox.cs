@@ -1,40 +1,7 @@
 using Casino.Contracts;
 using Casino.Modules.Wallet.Domain;
-using Marten;
-using Microsoft.Extensions.DependencyInjection;
-using Wolverine.Marten;
 
 namespace Casino.Modules.Wallet.Application;
-
-/// <summary>Un outbox enlistado en una sesion de Marten: lo que se publique se guarda en la MISMA transaccion que los eventos.</summary>
-public interface IOutboxSession : IAsyncDisposable
-{
-    ValueTask PublishAsync(object message);
-}
-
-public interface IOutboxFactory
-{
-    IOutboxSession Enroll(IDocumentSession session);
-}
-
-/// <summary>Outbox transaccional de Wolverine sobre Marten. Cada intento de una operacion abre su propio scope.</summary>
-public sealed class WolverineOutboxFactory(IServiceScopeFactory scopes) : IOutboxFactory
-{
-    public IOutboxSession Enroll(IDocumentSession session)
-    {
-        var scope = scopes.CreateAsyncScope();
-        var outbox = scope.ServiceProvider.GetRequiredService<IMartenOutbox>();
-        outbox.Enroll(session);
-        return new Session(scope, outbox);
-    }
-
-    private sealed class Session(AsyncServiceScope scope, IMartenOutbox outbox) : IOutboxSession
-    {
-        public ValueTask PublishAsync(object message) => outbox.PublishAsync(message);
-
-        public ValueTask DisposeAsync() => scope.DisposeAsync();
-    }
-}
 
 /// <summary>Traduce los eventos internos de la Wallet a los hechos publicos (contratos) que consumen otros modulos.</summary>
 internal static class WalletIntegrationEvents

@@ -28,3 +28,25 @@ fichas aunque el broker o la base fallen en el peor momento.
   codigo de los handlers para produccion).
 - La regla delicada "una ronda ya sorteada nunca se libera" depende de tiempos: el juego debe resolver bastante antes de que
   venza la reserva.
+
+## Flujo de una apuesta de ruleta (implementado)
+
+```
+POST /games/roulette/bets  (Idempotency-Key)
+  1. En UNA transaccion: el servidor asigna el nonce, se guarda la ronda (Placed) y se encola ReserveStake (outbox)
+  2. Wallet reserva            -> StakeReserved  (y programa ExpireReservation para dentro de N segundos)
+     o rechaza                 -> StakeRejected  -> ronda Rejected
+  3. Games sortea con el nonce ya asignado, guarda el resultado (Resolved) y encola RoundResolved (misma transaccion)
+  4. Wallet liquida            -> StakeSettled  -> ronda Settled
+     o rechaza (reserva vencida) -> StakeSettlementRejected -> ronda Voided
+  Si nadie liquida a tiempo: ExpireReservation libera la reserva -> StakeReleased -> ronda Voided
+```
+
+- **El nonce se asigna al colocar la apuesta**, no al sortear: asi el servidor no puede reordenar el procesamiento para
+  cambiar el resultado de una apuesta ya hecha.
+- **La regla "una ronda sorteada nunca se libera"** se cumple por tiempos: el sorteo tarda milisegundos y la reserva dura
+  `Wallet:ReservationTtlSeconds` (60 s por defecto). Si el resultado llega despues del vencimiento, la Wallet lo rechaza y
+  la ronda se anula: el jugador recupera su apuesta y no cobra un premio sobre una reserva ya devuelta.
+- **Rotar las seeds** esta bloqueado mientras haya apuestas sin cerrar; toda ronda en estado final cierra su apuesta en el generador.
+- **Limitacion conocida:** una ronda `Placed` sin ninguna respuesta (por ejemplo, el juego caido para siempre) se anula cuando la
+  Wallet libera la reserva; si el mensaje de liberacion tampoco llega, falta un barrido periodico de rondas viejas.

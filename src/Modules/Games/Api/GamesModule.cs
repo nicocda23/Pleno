@@ -1,3 +1,4 @@
+using Casino.BuildingBlocks;
 using Casino.Modules.Games.Application;
 using Casino.Modules.Games.Infrastructure;
 using Microsoft.AspNetCore.Routing;
@@ -14,7 +15,9 @@ public static class GamesModule
     {
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(sp => SeedProtector.FromBase64Key(sp.GetRequiredService<IConfiguration>()["Fairness:MasterKey"]));
+        services.TryAddSingleton<IOutboxFactory, WolverineOutboxFactory>();
         services.AddSingleton<FairnessService>();
+        services.AddSingleton<RouletteService>();
         return services;
     }
 
@@ -22,6 +25,7 @@ public static class GamesModule
     public static IEndpointRouteBuilder MapGamesModule(this IEndpointRouteBuilder app)
     {
         FairnessEndpoints.Map(app);
+        RouletteEndpoints.Map(app);
         return app;
     }
 }

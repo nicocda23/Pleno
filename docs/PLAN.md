@@ -106,8 +106,8 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 
 - [x] RNG provably fair: server seed hasheado, client seed y nonce (seeds por usuario con rotación, nonce asignado por el servidor y cifrado en reposo)
 - [x] Ruleta europea como primer juego (lógica pura, 100% testeada) con todas las apuestas
-- [ ] Outbox en Wallet e Inbox en Game Engine sobre RabbitMQ (outbox de la Wallet, inbox durable, topología y pruebas con caída del broker hechos; falta el consumidor del Game Engine: paso 2d)
-- [ ] Saga de apuesta con timeout y compensación
+- [x] Outbox en Wallet e Inbox en Game Engine sobre RabbitMQ
+- [x] Saga de apuesta con timeout y compensación (coreografiada, ver ADR 0002)
 - [ ] Hub de SignalR para saldo y resultados en vivo
 - [ ] Página de verificación de jugadas para el usuario
 
