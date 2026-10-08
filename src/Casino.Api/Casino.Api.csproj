@@ -7,6 +7,13 @@
     <ProjectReference Include="..\Modules\Realtime\Casino.Modules.Realtime.csproj" />
     <ProjectReference Include="..\Modules\Users\Casino.Modules.Users.csproj" />
     <ProjectReference Include="..\Modules\Promotions\Casino.Modules.Promotions.csproj" />
+    <ProjectReference Include="..\Casino.Contracts\Casino.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WolverineFx.Marten" Version="6.48.1" />
+    <PackageReference Include="WolverineFx.RabbitMQ" Version="6.48.1" />
+    <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.48.1" />
   </ItemGroup>
 
   <PropertyGroup>

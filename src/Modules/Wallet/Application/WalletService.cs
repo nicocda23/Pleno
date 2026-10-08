@@ -22,7 +22,8 @@ public sealed class WalletService(
     IDocumentStore store,
     TimeProvider clock,
     int maxAttempts = WalletService.DefaultMaxAttempts,
-    int snapshotEvery = WalletService.DefaultSnapshotEvery)
+    int snapshotEvery = WalletService.DefaultSnapshotEvery,
+    IOutboxFactory? outbox = null)
 {
     public const int DefaultMaxAttempts = 20;
     public const int DefaultSnapshotEvery = 50;
@@ -136,6 +137,17 @@ public sealed class WalletService(
                 {
                     // Mismo commit que los eventos: el snapshot nunca queda adelantado ni atrasado respecto del stream.
                     session.Store(account.ToSnapshot());
+                }
+
+                // Outbox: los hechos se guardan en la MISMA transaccion que los eventos. Si el commit falla no se publica
+                // nada; si el commit sale bien, el mensaje esta garantizado aunque RabbitMQ este caido en ese momento.
+                await using var outboxSession = outbox?.Enroll(session);
+                if (outboxSession is not null)
+                {
+                    foreach (var message in WalletIntegrationEvents.From(accountId, account.UncommittedEvents, account))
+                    {
+                        await outboxSession.PublishAsync(message);
+                    }
                 }
 
                 await session.SaveChangesAsync(ct);
