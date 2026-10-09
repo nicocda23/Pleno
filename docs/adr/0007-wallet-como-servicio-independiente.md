@@ -37,5 +37,10 @@ ordenes y publica hechos) y la que mas valor tiene aislar: es la dueña de las f
 - **Mas piezas para operar:** otro proceso, otra base y un salto de red mas en cada llamada a la Wallet. Es el precio de poder escalar,
   desplegar y fallar por separado. Las mediciones con k6 (ver `docs/pruebas-de-carga.md`) cuantifican ese costo.
 - **Los hechos de la Wallet siguen llegando por RabbitMQ** a los juegos y al tiempo real; ese camino no cambio.
+- **Rendimiento medido (k6, `docs/pruebas-de-carga.md`):** no hay diferencia medible entre el monolito y la Wallet separada en esta maquina
+  (a 50 jugadores ambos cierran ~850 a 1.000 apuestas por minuto con una mediana de cobro de 1,7 a 3,5 s; el ruido entre corridas es mayor
+  que cualquier diferencia). El techo es el mismo, asi que el cuello de botella no es el salto entre servicios: se investiga con trazas.
+- **Validado en el sistema real (Aspire + navegador):** login, alta, saldo vía gateway, apuestas, saldo en vivo por SignalR (el hecho cruza
+  Wallet → RabbitMQ → API → navegador) y verificacion pasan con los servicios separados (e2e de Playwright).
 - **Pendiente (siguiente paso de la fase 4):** extraer tambien el motor de juegos, con su propia base, y volver a medir.
 - **Pruebas mas lentas:** cada prueba levanta dos hosts en vez de uno. Si molesta, las que no cruzan el limite pueden levantar uno solo.
