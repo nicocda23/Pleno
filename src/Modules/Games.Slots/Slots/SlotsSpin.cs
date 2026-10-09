@@ -1,4 +1,4 @@
-using Casino.Modules.Games.Roulette;
+using Casino.Modules.Games.Application;
 using Marten.Schema;
 
 namespace Casino.Modules.Games.Slots;

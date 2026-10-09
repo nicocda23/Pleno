@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./ApiProvider";
 import { ApiError } from "./client";
-import type { Account, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
+import type { Account, GameInfo, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
 
 export const queryKeys = {
   spinsAll: ["spins"] as const,
@@ -17,6 +17,7 @@ export const queryKeys = {
   adminCredits: (filter: CreditFilter) => ["admin", "credits", filter] as const,
   adminCreditsAll: ["admin", "credits"] as const,
   movements: ["movements"] as const,
+  games: ["games"] as const,
   slotsSettings: ["admin", "slots-settings"] as const,
   slotsSettingsHistory: ["admin", "slots-settings-history"] as const,
   adminAccount: (userId: string) => ["admin", "account", userId] as const,
@@ -227,4 +228,10 @@ export function useSlotsSettingsHistory(enabled: boolean) {
     queryFn: () => api.get<SlotsSettingsHistoryItem[]>("/backoffice/games/slots/settings/history?limit=25"),
     enabled,
   });
+}
+
+/** El catalogo de juegos habilitados en el servidor. El lobby lista esto: agregar o quitar un juego no toca el front. */
+export function useGames() {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.games, queryFn: () => api.get<GameInfo[]>("/games"), staleTime: 60_000 });
 }

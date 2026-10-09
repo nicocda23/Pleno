@@ -1,6 +1,5 @@
 using Casino.BuildingBlocks;
 using Casino.Modules.Games.Application;
-using Casino.Modules.Games.Roulette;
 using Casino.Modules.Games.Slots;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -43,7 +42,7 @@ internal static class SlotsEndpoints
     {
         var group = app.MapGroup("/games/slots").WithTags("Slots");
         group.RequireAuthorization(policy => policy.RequireRole(Roles.Player));
-        group.AddEndpointFilter(RouletteEndpoints.MapDomainErrors);
+        group.AddEndpointFilter(GamesEndpointFilters.MapDomainErrors);
 
         // Tabla de pagos y retorno: informacion publica para el jugador.
         group.MapGet("/paytable", async (SlotsService slots, CancellationToken ct) =>

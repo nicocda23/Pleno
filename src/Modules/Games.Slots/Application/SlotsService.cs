@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Casino.BuildingBlocks;
 using Casino.Contracts;
-using Casino.Modules.Games.Roulette;
+using Casino.Modules.Games.Platform;
 using Casino.Modules.Games.Slots;
 using Marten;
 using Microsoft.Extensions.Logging;
@@ -19,7 +19,7 @@ public sealed partial class SlotsService(
     IOutboxFactory outbox,
     TimeProvider clock,
     SlotsSettingsStore settings,
-    ILogger<SlotsService> logger)
+    ILogger<SlotsService> logger) : IGameRounds
 {
     /// <summary>La tabla de pagos vigente y su version.</summary>
     public Task<SlotsSettingsSnapshot> GetSettingsAsync(CancellationToken ct = default) => settings.GetCurrentAsync(ct);

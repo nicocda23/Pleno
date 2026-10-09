@@ -7,6 +7,7 @@ var postgres = builder.AddPostgres("postgres")
 // serian servidores o instancias separadas, sin cambiar el codigo).
 var walletDb = postgres.AddDatabase("walletdb");
 var usersDb = postgres.AddDatabase("usersdb");
+var gamesDb = postgres.AddDatabase("gamesdb");
 
 var redis = builder.AddRedis("redis")
     .WithDataVolume();
@@ -40,9 +41,17 @@ var wallet = builder.AddProject<Projects.Casino_WalletService>("wallet")
     .WithReference(rabbit).WaitFor(rabbit)
     .WithEnvironment("Authentication__Authority", keycloakAuthority);
 
+// Servicio de juegos: plataforma provably fair y los juegos habilitados (ruleta, tragamonedas...). Tampoco se expone al navegador.
+// La clave maestra de las semillas (Fairness:MasterKey) es un secreto de usuario de ESTE proyecto, no de la API.
+var games = builder.AddProject<Projects.Casino_GamesService>("games")
+    .WithReference(gamesDb).WaitFor(gamesDb)
+    .WithReference(rabbit).WaitFor(rabbit)
+    .WithEnvironment("Authentication__Authority", keycloakAuthority);
+
 builder.AddProject<Projects.Casino_Api>("api")
     .WithReference(usersDb).WaitFor(usersDb)
     .WithReference(wallet).WaitFor(wallet) // el gateway reenvia /wallet y /backoffice/wallet a este servicio
+    .WithReference(games).WaitFor(games) // ... y /games, /fairness y /backoffice/games a este
     .WithReference(redis).WaitFor(redis)
     .WithReference(rabbit).WaitFor(rabbit)
     .WithEnvironment("Authentication__Authority", keycloakAuthority)

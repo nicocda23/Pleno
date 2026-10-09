@@ -36,7 +36,7 @@ internal static class SlotsAdminEndpoints
     {
         var group = app.MapGroup("/backoffice/games/slots").WithTags("Backoffice");
         group.RequireAuthorization(policy => policy.RequireRole(Roles.Backoffice));
-        group.AddEndpointFilter(RouletteEndpoints.MapDomainErrors);
+        group.AddEndpointFilter(GamesEndpointFilters.MapDomainErrors);
 
         group.MapGet("/settings", async (SlotsSettingsStore settings, CancellationToken ct) =>
             Results.Ok(ToResponse(await settings.GetCurrentAsync(ct), settings.Baseline)));

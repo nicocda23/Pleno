@@ -26,15 +26,17 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
     private const string BalanceEvents = "wallet.balance-events";
 
     private CasinoCluster _factory = null!;
-    private IHost _host = null!; // el host principal: desde aca los juegos publican ordenes a la Wallet
+    private IHost _host = null!; // el servicio de juegos: desde aca se publican las ordenes a la Wallet
     private IHost _walletHost = null!;
+    private IHost _apiHost = null!; // consume los cambios de saldo (tiempo real)
     private WalletService _wallet = null!;
 
     public Task InitializeAsync()
     {
         _factory = TestAuth.StartApp(db, rabbit);
-        _host = _factory.Api.Services.GetRequiredService<IHost>();
+        _host = _factory.Games.Services.GetRequiredService<IHost>();
         _walletHost = _factory.Wallet.Services.GetRequiredService<IHost>();
+        _apiHost = _factory.Api.Services.GetRequiredService<IHost>();
         _wallet = _factory.Wallet.Services.GetRequiredService<WalletService>();
         return Task.CompletedTask;
     }
@@ -49,9 +51,9 @@ public sealed class WalletMessagingTests(PostgresFixture db, RabbitMqFixture rab
     }
 
     private Task<ITrackedSession> TrackAsync(Func<IMessageBus, Task> action) =>
-        // Se sigue la actividad de AMBOS servicios: el mensaje sale de uno, viaja por RabbitMQ y lo procesa el otro.
+        // Se sigue la actividad de TODOS los servicios que participan: el mensaje sale de uno, viaja por RabbitMQ y lo procesan los otros.
         _host.TrackActivity()
-            .AlsoTrack(_walletHost)
+            .AlsoTrack(_walletHost, _apiHost)
             .IncludeExternalTransports()
             .Timeout(TimeSpan.FromSeconds(45))
             .ExecuteAndWaitAsync(action);

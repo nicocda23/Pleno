@@ -92,7 +92,7 @@ public sealed class ServiceSeparationTests(PostgresFixture db, RabbitMqFixture r
     public async Task Each_service_has_its_own_database_and_none_holds_the_tables_of_the_other()
     {
         using var cluster = StartCluster();
-        // Marten crea las tablas al primer uso: se usa cada servicio una vez (una operacion de la Wallet y una visita del jugador al juego).
+        // Marten crea las tablas al primer uso: se usa cada servicio una vez (la Wallet, los usuarios y los juegos).
         var userId = Guid.NewGuid();
         var accountId = await cluster.Wallet.Services.GetRequiredService<WalletService>().OpenAccountAsync(userId);
         await cluster.Wallet.Services.GetRequiredService<WalletService>().CreditAsync(accountId, "schema-check", 1);
@@ -104,20 +104,33 @@ public sealed class ServiceSeparationTests(PostgresFixture db, RabbitMqFixture r
 
         var walletSchemas = await SchemasAsync(db.WalletDbConnectionString);
         var usersSchemas = await SchemasAsync(db.UsersDbConnectionString);
+        var gamesSchemas = await SchemasAsync(db.GamesDbConnectionString);
 
         // La Wallet: sus eventos y su idempotencia. Nada de usuarios ni de juegos.
         Assert.Contains("wallet", walletSchemas);
         Assert.True(await TableExistsAsync(db.WalletDbConnectionString, "wallet", "mt_events"));
         Assert.True(await TableExistsAsync(db.WalletDbConnectionString, "wallet", "mt_doc_idempotencyrecord"));
         Assert.DoesNotContain("casino", walletSchemas);
+        Assert.DoesNotContain("games", walletSchemas);
         Assert.False(await TableExistsAsync(db.WalletDbConnectionString, "wallet", "mt_doc_userprofile"));
+        Assert.False(await TableExistsAsync(db.WalletDbConnectionString, "wallet", "mt_doc_rouletteround"));
 
-        // El host principal: usuarios y juegos. Ni rastro de las tablas de la Wallet.
+        // El host principal: solo usuarios. Ni rastro de las tablas de la Wallet ni de los juegos.
         Assert.Contains("casino", usersSchemas);
         Assert.True(await TableExistsAsync(db.UsersDbConnectionString, "casino", "mt_doc_userprofile"));
-        Assert.True(await TableExistsAsync(db.UsersDbConnectionString, "casino", "mt_doc_rouletteround"));
         Assert.DoesNotContain("wallet", usersSchemas);
+        Assert.DoesNotContain("games", usersSchemas);
         Assert.False(await TableExistsAsync(db.UsersDbConnectionString, "casino", "mt_doc_idempotencyrecord"));
+        Assert.False(await TableExistsAsync(db.UsersDbConnectionString, "casino", "mt_doc_rouletteround"));
+
+        // Los juegos: las semillas (equidad) y las rondas de cada juego. Ni rastro de usuarios ni de la Wallet.
+        Assert.Contains("games", gamesSchemas);
+        Assert.True(await TableExistsAsync(db.GamesDbConnectionString, "games", "mt_doc_rouletteround"));
+        Assert.True(await TableExistsAsync(db.GamesDbConnectionString, "games", "mt_events"));
+        Assert.DoesNotContain("wallet", gamesSchemas);
+        Assert.DoesNotContain("casino", gamesSchemas);
+        Assert.False(await TableExistsAsync(db.GamesDbConnectionString, "games", "mt_doc_userprofile"));
+        Assert.False(await TableExistsAsync(db.GamesDbConnectionString, "games", "mt_doc_idempotencyrecord"));
     }
 
     [Fact]
@@ -215,5 +228,68 @@ public sealed class ServiceSeparationTests(PostgresFixture db, RabbitMqFixture r
         await WaitUntilAsync(
             async () => (await service.GetAsync(PlayerIds.WalletAccountFor(userId))).Available == welcome,
             "la cuenta del jugador se abre con las fichas de bienvenida");
+    }
+
+    [Fact]
+    public async Task The_games_service_validates_the_token_itself_and_does_not_trust_the_gateway()
+    {
+        using var cluster = StartCluster();
+        var userId = Guid.NewGuid();
+        using var direct = cluster.Games.CreateClient(); // sin pasar por el gateway
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await direct.GetAsync("/games")).StatusCode);
+        using var foreign = WithToken(cluster.Games.CreateClient(), TestAuth.Token(userId, signingKey: TestAuth.NewForeignKey()));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await foreign.GetAsync("/games")).StatusCode);
+        using var player = WithToken(cluster.Games.CreateClient(), TestAuth.Token(userId));
+        Assert.Equal(HttpStatusCode.OK, (await player.GetAsync("/games")).StatusCode);
+        // El rol tambien se exige en el servicio de juegos: la administracion de la tragamonedas es del backoffice.
+        Assert.Equal(HttpStatusCode.Forbidden, (await player.GetAsync("/backoffice/games/slots/settings")).StatusCode);
+        using var admin = WithToken(cluster.Games.CreateClient(), TestAuth.Token(Guid.NewGuid(), roles: [Roles.Backoffice]));
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/backoffice/games/slots/settings")).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_gateway_forwards_games_fairness_and_the_games_backoffice_to_the_games_service()
+    {
+        using var cluster = StartCluster();
+        var userId = Guid.NewGuid();
+        using var player = cluster.ClientFor(userId);
+        using var admin = cluster.ClientFor(Guid.NewGuid(), Roles.Backoffice);
+
+        Assert.Equal(HttpStatusCode.OK, (await player.GetAsync("/games")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await player.GetAsync("/games/slots/paytable")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await player.GetAsync("/fairness/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/backoffice/games/slots/settings")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await player.GetAsync("/backoffice/games/slots/settings")).StatusCode);
+        using var anonymous = cluster.CreateClient();
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/games")).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_games_service_does_not_expose_what_belongs_to_other_services()
+    {
+        using var cluster = StartCluster();
+        using var direct = WithToken(cluster.Games.CreateClient(), TestAuth.Token(Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.NotFound, (await direct.GetAsync("/wallet/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await direct.GetAsync("/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_games_service_that_is_down_does_not_take_the_wallet_or_the_users_down()
+    {
+        using var cluster = StartCluster();
+        var userId = Guid.NewGuid();
+        await cluster.Wallet.Services.GetRequiredService<WalletService>().OpenAccountAsync(userId);
+        using var client = cluster.ClientFor(userId);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/games")).StatusCode);
+
+        await cluster.Games.DisposeAsync(); // se cae el servicio de juegos
+
+        Assert.True((int)(await client.GetAsync("/games")).StatusCode >= 500);
+        Assert.True((int)(await client.GetAsync("/games/slots/paytable")).StatusCode >= 500);
+        // La Wallet y los usuarios siguen funcionando.
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/wallet/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/me")).StatusCode);
     }
 }

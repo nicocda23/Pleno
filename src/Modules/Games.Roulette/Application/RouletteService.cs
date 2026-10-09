@@ -2,26 +2,12 @@ using System.Security.Cryptography;
 using System.Text;
 using Casino.BuildingBlocks;
 using Casino.Contracts;
+using Casino.Modules.Games.Platform;
 using Casino.Modules.Games.Roulette;
 using Marten;
 using Microsoft.Extensions.Logging;
 
 namespace Casino.Modules.Games.Application;
-
-public enum GamesError
-{
-    InvalidBet,
-    InvalidIdempotencyKey,
-    BetKeyReused,
-    RoundNotFound,
-    InvalidSettings,
-    SettingsConflict,
-}
-
-public sealed class GamesDomainException(GamesError error, string message) : Exception(message)
-{
-    public GamesError Error { get; } = error;
-}
 
 public sealed record PlaceRouletteBetRequest(Guid UserId, Guid AccountId, RouletteBetType BetType, IReadOnlyList<int> Selection, long Stake);
 
@@ -30,9 +16,6 @@ public sealed record BetLine(RouletteBetType BetType, IReadOnlyList<int> Selecti
 
 /// <summary>Una tirada con una o varias apuestas: comparten nonce, numero sorteado y reserva.</summary>
 public sealed record PlaceRouletteSpinRequest(Guid UserId, Guid AccountId, IReadOnlyList<BetLine> Bets);
-
-/// <summary>Resultado de colocar una apuesta. La resolucion es asincrona: se consulta la ronda por su BetId.</summary>
-public sealed record PlacedBet(Guid BetId, RoundStatus Status, long Nonce, string Commitment, string ClientSeed, bool AlreadyPlaced);
 
 /// <summary>
 /// Coordina la vida de una apuesta de ruleta. No hay un orquestador: cada paso reacciona a un mensaje de la Wallet y es idempotente.
@@ -43,7 +26,7 @@ public sealed partial class RouletteService(
     FairnessService fairness,
     IOutboxFactory outbox,
     TimeProvider clock,
-    ILogger<RouletteService> logger)
+    ILogger<RouletteService> logger) : IGameRounds
 {
     /// <summary>Maximo de apuestas en una tirada: alcanza para cubrir todo el tapete (157 lugares) y acota el tamaño de la ronda.</summary>
     public const int MaxBetsPerSpin = 200;

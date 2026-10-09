@@ -129,6 +129,20 @@ export interface PlacedBet {
   alreadyPlaced: boolean;
 }
 
+/** Quien decide el resultado de un juego: el servidor (verificable) o la propia pagina. */
+export type GameResolution = "Server" | "Client";
+
+/** La ficha de un juego en el catalogo del servidor: lo minimo que todo juego declara. El lobby se arma con esto. */
+export interface GameInfo {
+  id: string;
+  name: string;
+  tagline: string;
+  /** Ruta del front donde se juega. */
+  route: string;
+  glyph: string;
+  resolution: GameResolution;
+}
+
 /** Un giro de tragamonedas. */
 export interface Spin {
   betId: string;

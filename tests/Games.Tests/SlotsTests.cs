@@ -1,4 +1,5 @@
 using Casino.Modules.Games.Fairness;
+using Casino.Modules.Games.Application;
 using Casino.Modules.Games.Roulette;
 using Casino.Modules.Games.Slots;
 using Microsoft.Extensions.Configuration;
