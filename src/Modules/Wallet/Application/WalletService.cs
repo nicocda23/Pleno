@@ -20,7 +20,7 @@ public sealed record BalanceAtDate(
     long Total,
     long EventsApplied);
 
-public sealed class WalletService(
+public sealed partial class WalletService(
     IDocumentStore store,
     TimeProvider clock,
     int maxAttempts = WalletService.DefaultMaxAttempts,

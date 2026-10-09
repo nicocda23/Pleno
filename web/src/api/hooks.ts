@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./ApiProvider";
 import { ApiError } from "./client";
-import type { Account, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
+import type { Account, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
 
 export const queryKeys = {
   spinsAll: ["spins"] as const,
@@ -14,6 +14,9 @@ export const queryKeys = {
   fairness: ["fairness"] as const,
   adminUsers: ["admin", "users"] as const,
   adminAudit: ["admin", "audit"] as const,
+  adminCredits: (filter: CreditFilter) => ["admin", "credits", filter] as const,
+  adminCreditsAll: ["admin", "credits"] as const,
+  movements: ["movements"] as const,
   adminAccount: (userId: string) => ["admin", "account", userId] as const,
 };
 
@@ -108,6 +111,7 @@ export function useCreditChips() {
       Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.adminAccount(userId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.adminAudit }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.adminCreditsAll }),
       ]),
   });
 }
@@ -148,5 +152,35 @@ export function useSpin(betId: string | null) {
       const status = query.state.data?.status;
       return status === "Settled" || status === "Rejected" || status === "Voided" ? false : 1_000;
     },
+  });
+}
+
+/** Extracto de movimientos del jugador, de a paginas (cursor). Se pide "cargar mas" para ver lo anterior. */
+export function useMovements(pageSize = 30) {
+  const api = useApi();
+  return useInfiniteQuery({
+    queryKey: queryKeys.movements,
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam }) => api.get<MovementsPage>(`/wallet/me/movements?limit=${pageSize}${pageParam === null ? "" : `&before=${pageParam}`}`),
+    getNextPageParam: (last) => last.nextBefore ?? undefined,
+  });
+}
+
+/** Historial general de cargas (solo administrador): filtros por jugador y fechas, paginado, con el total del filtro. */
+export function useAdminCredits(filter: CreditFilter, enabled: boolean, pageSize = 25) {
+  const api = useApi();
+  return useInfiniteQuery({
+    queryKey: queryKeys.adminCredits(filter),
+    initialPageParam: null as string | null,
+    enabled,
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ limit: String(pageSize) });
+      if (filter.userId) params.set("userId", filter.userId);
+      if (filter.from) params.set("from", filter.from);
+      if (filter.to) params.set("to", filter.to);
+      if (pageParam) params.set("before", pageParam);
+      return api.get<CreditHistory>(`/backoffice/wallet/credits?${params.toString()}`);
+    },
+    getNextPageParam: (last) => last.nextBefore ?? undefined,
   });
 }

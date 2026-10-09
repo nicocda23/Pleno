@@ -56,6 +56,8 @@ Luego `curl -H "Authorization: Bearer <access_token>" http://localhost:5188/me`.
 | `GET /games/roulette/rounds`, `GET /games/roulette/rounds/{id}` | player | Mi historial y una ronda propia |
 | `GET /backoffice/users` | backoffice | Jugadores registrados (id y fecha de alta) para el panel `/admin` |
 | `GET /backoffice/wallet/users/{id}`, `.../balance`, `POST .../credit` | backoffice | Consulta y ajuste manual (cada carga queda en la auditoria) |
+| `GET /wallet/me/movements?limit=&before=` | player | Mi extracto: cada cambio de fichas disponibles con el saldo resultante (paginado por cursor) |
+| `GET /backoffice/wallet/credits?limit=&before=&userId=&from=&to=` | backoffice | Historial general de cargas con filtros, paginado y total de fichas del filtro |
 | `GET /backoffice/wallet/audit?limit=` | backoffice | Registro de auditoria: quien cargo fichas, a quien, cuanto y cuando |
 
 ## Panel de administracion (`/admin`)

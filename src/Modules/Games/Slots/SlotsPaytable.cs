@@ -78,7 +78,7 @@ public sealed class SlotsPaytable
 
     public IReadOnlyList<LeadingPay> LeadingPays { get; }
 
-    public long MinStake => 1;
+    public long MinStake { get; } = 1;
 
     public long MaxStake { get; }
 

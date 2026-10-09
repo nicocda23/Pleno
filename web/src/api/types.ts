@@ -16,6 +16,41 @@ export interface AuditEntry {
   occurredAt: string;
 }
 
+/** Que paso con las fichas disponibles. */
+export type MovementKind = "WelcomeBonus" | "Credit" | "Stake" | "Prize" | "Refund" | "Reversal";
+
+/** Un movimiento del saldo: `delta` con signo y el saldo disponible justo despues. */
+export interface Movement {
+  version: number;
+  at: string;
+  kind: MovementKind;
+  delta: number;
+  balanceAfter: number;
+  reference: string | null;
+}
+
+export interface MovementsPage {
+  items: Movement[];
+  /** Cursor de la pagina siguiente; null si no hay mas. */
+  nextBefore: number | null;
+}
+
+/** Pagina del historial general de cargas, con el total de lo que cumple el filtro (no solo de la pagina). */
+export interface CreditHistory {
+  items: AuditEntry[];
+  nextBefore: string | null;
+  totalAmount: number;
+  count: number;
+}
+
+export interface CreditFilter {
+  userId: string | null;
+  /** Inicio (inclusive) del rango, ISO. */
+  from: string | null;
+  /** Fin (exclusivo) del rango, ISO. */
+  to: string | null;
+}
+
 export interface CreditResult {
   transactionId: string;
   isDuplicate: boolean;
