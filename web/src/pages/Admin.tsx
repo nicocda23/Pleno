@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { BACKOFFICE_ROLE, useAdminAccount, useAdminAudit, useAdminUsers, useCreditChips, useMe } from "../api/hooks";
 import { useToasts } from "../components/Toasts";
 import { formatChips, formatDateTime } from "../lib/format";
@@ -123,7 +124,7 @@ export function Admin() {
 
       <section className="card" aria-labelledby="admin-auditoria">
         <h2 id="admin-auditoria">Auditoría</h2>
-        <p className="muted">Quién cargó fichas, a quién y cuándo. Solo se agrega: no se edita ni se borra.</p>
+        <p className="muted">Las últimas cargas. Solo se agrega: no se edita ni se borra. <Link to="/admin/cargas">Ver el historial completo con filtros</Link></p>
         {audit.isError && <p className="notice notice--error" role="alert">No pudimos cargar la auditoría.</p>}
         {audit.data?.length === 0 && <p className="muted">Todavía no hay cargas.</p>}
         {audit.data && audit.data.length > 0 && (

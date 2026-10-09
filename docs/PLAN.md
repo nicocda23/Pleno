@@ -116,7 +116,7 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 - [x] Lobby con catálogo de juegos y saldo en vivo
 - [x] Ruleta animada con PixiJS (tapete completo con 157 apuestas, rueda con bola que cae en el número que ya decidió el servidor)
 - [x] Tragamonedas con tabla de pagos configurable (3 rodillos, retorno exacto validado al arrancar, ver ADR 0006)
-- [ ] Historial de jugadas y movimientos (jugadas hechas, con verificación; faltan los movimientos de saldo)
+- [x] Historial de jugadas y movimientos (jugadas con verificación y extracto de movimientos de saldo derivado del ledger; el admin tiene el historial general de cargas)
 - [ ] Animaciones de premios, sonido y modo oscuro (modo oscuro hecho; faltan animaciones de premios y sonido)
 - [x] Login con Keycloak o Entra External ID (Keycloak)
 

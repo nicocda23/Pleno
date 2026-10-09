@@ -33,6 +33,7 @@ export function Layout() {
           <NavLink to="/" end>Lobby</NavLink>
           <NavLink to="/ruleta">Ruleta</NavLink>
           <NavLink to="/historial">Historial</NavLink>
+          <NavLink to="/movimientos">Movimientos</NavLink>
           {isAdmin && <NavLink to="/admin">Admin</NavLink>}
         </nav>
 

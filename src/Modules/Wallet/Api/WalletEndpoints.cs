@@ -12,6 +12,8 @@ public sealed record CreditRequest(long Amount);
 public sealed record AuditEntryResponse(
     string Action, Guid ActorUserId, Guid TargetUserId, long Amount, Guid TransactionId, DateTimeOffset OccurredAt);
 
+public sealed record CreditHistoryResponse(IReadOnlyList<AuditEntryResponse> Items, DateTimeOffset? NextBefore, long TotalAmount, int Count);
+
 public sealed record OperationResponse(Guid TransactionId, bool IsDuplicate);
 
 public sealed record AccountResponse(
@@ -41,6 +43,10 @@ internal static class WalletEndpoints
         player.MapGet("/me/balance", (HttpContext http, DateTimeOffset asOf, WalletService wallet, CancellationToken ct) =>
             GetBalanceAsync(http.User.GetUserId(), asOf, wallet, ct));
 
+        // Extracto de movimientos: la cuenta sale del token, un jugador solo ve el suyo.
+        player.MapGet("/me/movements", async (HttpContext http, WalletService wallet, int? limit, long? before, CancellationToken ct) =>
+            Results.Ok(await wallet.GetMovementsAsync(PlayerIds.WalletAccountFor(http.User.GetUserId()), Math.Clamp(limit ?? 30, 1, 100), before, ct)));
+
         var backoffice = app.MapGroup("/backoffice/wallet").WithTags("Backoffice");
         backoffice.RequireAuthorization(policy => policy.RequireRole(Roles.Backoffice));
         backoffice.AddEndpointFilter(MapDomainErrors);
@@ -68,6 +74,21 @@ internal static class WalletEndpoints
             // Tambien si fue un duplicado: asi un reintento completa la anotacion si fallo la primera vez.
             await audit.RecordCreditAsync(context.User.GetUserId(), userId, accountId, body.Amount, key, outcome.TransactionId, ct);
             return Results.Ok(new OperationResponse(outcome.TransactionId, outcome.IsDuplicate));
+        });
+
+        // Historial general de cargas: filtros por jugador y fechas, paginado, con el total de fichas cargadas en el filtro.
+        backoffice.MapGet("/credits", async (
+            int? limit, DateTimeOffset? before, Guid? userId, DateTimeOffset? from, DateTimeOffset? to, BackofficeAudit audit, CancellationToken ct) =>
+        {
+            if (from is not null && to is not null && from >= to)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "InvalidRange", detail: "La fecha 'desde' debe ser anterior a 'hasta'.");
+            }
+
+            var history = await audit.QueryCreditsAsync(new CreditFilter(userId, from, to), Math.Clamp(limit ?? 25, 1, 100), before, ct);
+            return Results.Ok(new CreditHistoryResponse(
+                [.. history.Items.Select(e => new AuditEntryResponse(e.Action, e.ActorUserId, e.TargetUserId, e.Amount, e.TransactionId, e.OccurredAt))],
+                history.NextBefore, history.TotalAmount, history.Count));
         });
 
         // Registro de auditoria: quien cargo fichas, a quien y cuando.

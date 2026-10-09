@@ -45,6 +45,41 @@ public sealed class BackofficeAudit(IDocumentStore store, TimeProvider clock)
         }
     }
 
+    /// <summary>
+    /// Historial de cargas con filtros (jugador, desde, hasta) y paginado por cursor de fecha. Devuelve ademas el total de fichas y la
+    /// cantidad de cargas que cumplen el filtro (no solo las de la pagina).
+    /// </summary>
+    public async Task<CreditHistory> QueryCreditsAsync(CreditFilter filter, int limit, DateTimeOffset? before, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+
+        await using var session = store.QuerySession();
+        var query = session.Query<AuditEntry>().Where(e => e.Action == ChipsCreditedAction);
+        if (filter.TargetUserId is { } target)
+        {
+            query = query.Where(e => e.TargetUserId == target);
+        }
+
+        if (filter.From is { } from)
+        {
+            query = query.Where(e => e.OccurredAt >= from);
+        }
+
+        if (filter.To is { } to)
+        {
+            query = query.Where(e => e.OccurredAt < to);
+        }
+
+        var count = await query.CountAsync(ct);
+        var total = count == 0 ? 0 : await query.SumAsync(e => e.Amount, ct);
+
+        var page = before is { } cursor ? query.Where(e => e.OccurredAt < cursor) : query;
+        var rows = await page.OrderByDescending(e => e.OccurredAt).Take(limit + 1).ToListAsync(ct);
+        var items = rows.Take(limit).ToList();
+        return new CreditHistory(items, rows.Count > limit ? items[^1].OccurredAt : null, total, count);
+    }
+
     /// <summary>Las anotaciones mas recientes primero.</summary>
     public async Task<IReadOnlyList<AuditEntry>> ListAsync(int limit, CancellationToken ct = default)
     {
@@ -52,6 +87,11 @@ public sealed class BackofficeAudit(IDocumentStore store, TimeProvider clock)
         return await session.Query<AuditEntry>().OrderByDescending(e => e.OccurredAt).Take(limit).ToListAsync(ct);
     }
 }
+
+/// <summary>Filtros del historial de cargas. Todos opcionales; <see cref="To"/> es exclusivo.</summary>
+public sealed record CreditFilter(Guid? TargetUserId = null, DateTimeOffset? From = null, DateTimeOffset? To = null);
+
+public sealed record CreditHistory(IReadOnlyList<AuditEntry> Items, DateTimeOffset? NextBefore, long TotalAmount, int Count);
 
 public sealed class AuditEntry
 {

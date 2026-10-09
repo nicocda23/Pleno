@@ -3,6 +3,8 @@ import { Route, Routes } from "react-router-dom";
 import { ApiProvider } from "./api/ApiProvider";
 import { RequireAuth } from "./auth/RequireAuth";
 import { Admin } from "./pages/Admin";
+import { AdminCredits } from "./pages/AdminCredits";
+import { Movements } from "./pages/Movements";
 import { AuthCallback } from "./pages/AuthCallback";
 import { History } from "./pages/History";
 import { Lobby } from "./pages/Lobby";
@@ -24,6 +26,8 @@ export function App() {
           <Route path="tragamonedas" element={<Suspense fallback={<p className="muted" role="status">Cargando la tragamonedas…</p>}><Slots /></Suspense>} />
           <Route path="historial" element={<History />} />
           <Route path="admin" element={<Admin />} />
+          <Route path="admin/cargas" element={<AdminCredits />} />
+          <Route path="movimientos" element={<Movements />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -85,6 +85,7 @@ export function RealtimeProvider({ children, connectionFactory = defaultConnecti
       void queryClient.invalidateQueries({ queryKey: queryKeys.account });
       void queryClient.invalidateQueries({ queryKey: queryKeys.roundsAll });
       void queryClient.invalidateQueries({ queryKey: queryKeys.spinsAll });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.movements });
     };
 
     hub.on("balanceChanged", ((notice: BalanceNotice) => dispatch({ type: "notice", notice })) as (payload: never) => void);
@@ -92,6 +93,7 @@ export function RealtimeProvider({ children, connectionFactory = defaultConnecti
       listeners.current.forEach((listener) => listener(notice));
       void queryClient.invalidateQueries({ queryKey: queryKeys.roundsAll });
       void queryClient.invalidateQueries({ queryKey: queryKeys.spinsAll });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.movements });
     }) as (payload: never) => void);
     hub.onreconnecting(() => !disposed && setConnection("reconnecting"));
     hub.onreconnected(() => {
