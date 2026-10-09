@@ -18,10 +18,11 @@ public sealed partial class SlotsService(
     FairnessService fairness,
     IOutboxFactory outbox,
     TimeProvider clock,
-    SlotsPaytable paytable,
+    SlotsSettingsStore settings,
     ILogger<SlotsService> logger)
 {
-    public SlotsPaytable Paytable => paytable;
+    /// <summary>La tabla de pagos vigente y su version.</summary>
+    public Task<SlotsSettingsSnapshot> GetSettingsAsync(CancellationToken ct = default) => settings.GetCurrentAsync(ct);
 
     /// <summary>
     /// Coloca un giro. En UNA transaccion: asigna el nonce (lo decide el servidor), guarda el giro y encola la orden de reserva
@@ -34,6 +35,7 @@ public sealed partial class SlotsService(
             throw new GamesDomainException(GamesError.InvalidIdempotencyKey, "La IdempotencyKey es obligatoria y de hasta 128 caracteres.");
         }
 
+        var paytable = (await settings.GetCurrentAsync(ct)).Paytable;
         if (stake < paytable.MinStake || stake > paytable.MaxStake)
         {
             throw new GamesDomainException(GamesError.InvalidBet, $"La apuesta va de {paytable.MinStake} a {paytable.MaxStake} fichas.");
@@ -112,8 +114,9 @@ public sealed partial class SlotsService(
         }
 
         var inputs = await fairness.GetDrawInputsAsync(spin.UserId, spin.Id, ct);
-        var outcome = SlotsGame.Play(paytable, spin.Stake, inputs.ServerSeed, inputs.ClientSeed, inputs.Nonce);
-        spin.MarkResolved(outcome.Reels, outcome.Multiplier, outcome.Payout);
+        var current = await settings.GetCurrentAsync(ct);
+        var outcome = SlotsGame.Play(current.Paytable, spin.Stake, inputs.ServerSeed, inputs.ClientSeed, inputs.Nonce);
+        spin.MarkResolved(outcome.Reels, outcome.Multiplier, outcome.Payout, current.Version);
         session.Store(spin);
 
         // El resultado y el aviso a la Wallet salen en la misma transaccion: no puede quedar sorteado sin avisar.

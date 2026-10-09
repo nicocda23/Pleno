@@ -4,6 +4,7 @@ import { ApiProvider } from "./api/ApiProvider";
 import { RequireAuth } from "./auth/RequireAuth";
 import { Admin } from "./pages/Admin";
 import { AdminCredits } from "./pages/AdminCredits";
+import { AdminSlots } from "./pages/AdminSlots";
 import { Movements } from "./pages/Movements";
 import { AuthCallback } from "./pages/AuthCallback";
 import { History } from "./pages/History";
@@ -27,6 +28,7 @@ export function App() {
           <Route path="historial" element={<History />} />
           <Route path="admin" element={<Admin />} />
           <Route path="admin/cargas" element={<AdminCredits />} />
+          <Route path="admin/tragamonedas" element={<AdminSlots />} />
           <Route path="movimientos" element={<Movements />} />
         </Route>
         <Route path="*" element={<NotFound />} />

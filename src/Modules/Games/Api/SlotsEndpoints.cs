@@ -21,7 +21,8 @@ public sealed record SpinResponse(
     Guid PairId,
     long Nonce,
     string? FailureReason,
-    DateTimeOffset PlacedAt);
+    DateTimeOffset PlacedAt,
+    int? PaytableVersion);
 
 public sealed record PaytableResponse(
     int Reels,
@@ -45,9 +46,9 @@ internal static class SlotsEndpoints
         group.AddEndpointFilter(RouletteEndpoints.MapDomainErrors);
 
         // Tabla de pagos y retorno: informacion publica para el jugador.
-        group.MapGet("/paytable", (SlotsService slots) =>
+        group.MapGet("/paytable", async (SlotsService slots, CancellationToken ct) =>
         {
-            var table = slots.Paytable;
+            var table = (await slots.GetSettingsAsync(ct)).Paytable;
             return Results.Ok(new PaytableResponse(
                 SlotsPaytable.ReelCount, table.Symbols, table.LeadingPays, table.MinStake, table.MaxStake,
                 table.TotalWeight, Math.Round(table.ReturnToPlayerPercent, 2), Math.Round(table.HitRatePercent, 2)));
@@ -81,5 +82,5 @@ internal static class SlotsEndpoints
     }
 
     private static SpinResponse ToResponse(SlotsSpin spin) => new(
-        spin.Id, spin.Status, spin.Stake, spin.Reels, spin.Multiplier, spin.Payout, spin.PairId, spin.Nonce, spin.FailureReason, spin.PlacedAt);
+        spin.Id, spin.Status, spin.Stake, spin.Reels, spin.Multiplier, spin.Payout, spin.PairId, spin.Nonce, spin.FailureReason, spin.PlacedAt, spin.PaytableVersion);
 }

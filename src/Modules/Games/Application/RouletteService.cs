@@ -14,6 +14,8 @@ public enum GamesError
     InvalidIdempotencyKey,
     BetKeyReused,
     RoundNotFound,
+    InvalidSettings,
+    SettingsConflict,
 }
 
 public sealed class GamesDomainException(GamesError error, string message) : Exception(message)
