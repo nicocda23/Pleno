@@ -24,6 +24,40 @@ public class RouletteGameTests
     }
 
     [Fact]
+    public void A_spin_with_several_bets_draws_one_number_and_adds_up_what_each_bet_pays()
+    {
+        // Con nonce 0 sale el 26 (negro, columna 2, segunda docena).
+        var bets = new[]
+        {
+            RouletteBet.Create(RouletteBetType.Black, [], 100), // gana: 200
+            RouletteBet.Create(RouletteBetType.Red, [], 100), // pierde: 0 (apostar a los dos colores es legal)
+            RouletteBet.Create(RouletteBetType.Straight, [26], 10), // gana: 360
+            RouletteBet.Create(RouletteBetType.Straight, [7], 10), // pierde
+            RouletteBet.Create(RouletteBetType.Column, [2], 50), // gana: 150
+            RouletteBet.Create(RouletteBetType.Dozen, [1], 30), // pierde
+        };
+
+        var outcome = RouletteGame.PlayMany(bets, ServerSeed, ClientSeed, 0);
+
+        Assert.Equal(26, outcome.WinningNumber);
+        Assert.Equal(200 + 360 + 150, outcome.Payout);
+    }
+
+    [Fact]
+    public void A_spin_with_one_bet_gives_the_same_result_as_playing_that_bet_alone()
+    {
+        var bet = RouletteBet.Create(RouletteBetType.Black, [], 100);
+
+        Assert.Equal(RouletteGame.Play(bet, ServerSeed, ClientSeed, 0), RouletteGame.PlayMany([bet], ServerSeed, ClientSeed, 0));
+    }
+
+    [Fact]
+    public void A_spin_needs_at_least_one_bet()
+    {
+        Assert.Throws<ArgumentException>(() => RouletteGame.PlayMany([], ServerSeed, ClientSeed, 0));
+    }
+
+    [Fact]
     public void Each_nonce_gives_its_own_verifiable_result()
     {
         var red = RouletteBet.Create(RouletteBetType.Red, [], 100);

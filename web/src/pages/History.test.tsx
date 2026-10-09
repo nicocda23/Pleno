@@ -8,7 +8,7 @@ const PAIR_OLD = "11111111-1111-4111-8111-111111111111";
 const PAIR_NEW = "22222222-2222-4222-8222-222222222222";
 
 const round = (overrides: Partial<Round>): Round => ({
-  betId: "b1", status: "Settled", betType: "Red", selection: [], stake: 10, pairId: PAIR_OLD, nonce: 0,
+  betId: "b1", status: "Settled", betType: "Red", selection: [], stake: 10, bets: [{ betType: "Red", selection: [], stake: 10 }], pairId: PAIR_OLD, nonce: 0,
   winningNumber: 17, payout: 0, failureReason: null, placedAt: "2026-10-08T12:00:00Z", ...overrides,
 });
 

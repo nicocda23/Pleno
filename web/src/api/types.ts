@@ -24,7 +24,9 @@ export interface Round {
   status: RoundStatus;
   betType: RouletteBetType;
   selection: number[];
+  /** Total apostado en la tirada. */
   stake: number;
+  bets: BetLine[];
   pairId: string;
   nonce: number;
   winningNumber: number | null;
@@ -50,10 +52,16 @@ export type RouletteBetType =
   | "Low"
   | "High";
 
-export interface PlaceBetBody {
+/** Una apuesta dentro de una tirada. */
+export interface BetLine {
   betType: RouletteBetType;
   selection: number[];
   stake: number;
+}
+
+/** Una tirada: una o varias apuestas que comparten el mismo numero sorteado. */
+export interface PlaceBetBody {
+  bets: BetLine[];
 }
 
 export interface PlacedBet {

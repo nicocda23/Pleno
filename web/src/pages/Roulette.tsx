@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRound, usePlaceBet, useRounds } from "../api/hooks";
-import type { PlaceBetBody, Round, RoundClosedNotice } from "../api/types";
+import type { BetLine, PlaceBetBody, Round, RoundClosedNotice } from "../api/types";
 import { Board } from "../components/Board";
 import { Pocket } from "../components/Pocket";
 import { useToasts } from "../components/Toasts";
 import { WheelCanvas } from "../components/WheelCanvas";
-import { type PlacedChips, type Spot } from "../lib/board";
+import { aggregateChips, totalStake, type ChipDrop, type Spot } from "../lib/board";
 import { formatChips } from "../lib/format";
 import { errorMessage, failureMessage } from "../lib/messages";
 import { pocketColor } from "../lib/roulette";
@@ -46,11 +46,13 @@ export function Roulette() {
 
   const [model] = useState(() => new WheelModel({ reduceMotion: prefersReducedMotion() }));
   const [chip, setChip] = useState(10);
-  const [placed, setPlaced] = useState<PlacedChips | null>(null);
+  // Cada toque en el tapete es una ficha; se puede apostar a muchos lugares a la vez (incluso rojo y negro).
+  const [drops, setDrops] = useState<ChipDrop[]>([]);
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [winPopup, setWinPopup] = useState<Result | null>(null);
 
   // Misma apuesta = misma clave de idempotencia: si la respuesta se pierde y el jugador reintenta, el servidor no cobra dos veces.
   const pending = useRef<{ fingerprint: string; key: string } | null>(null);
@@ -66,8 +68,9 @@ export function Roulette() {
   };
   useEffect(() => release, []);
 
-  const stake = placed?.stake ?? 0;
-  const canBet = placed !== null && stake >= 1 && stake <= balance.available && !spinning && !placeBet.isPending;
+  const placed = useMemo(() => aggregateChips(drops), [drops]);
+  const stake = totalStake(placed);
+  const canBet = placed.length > 0 && stake <= balance.available && !spinning && !placeBet.isPending;
 
   const reveal = (closed: Result) => {
     setResult(closed);
@@ -75,7 +78,8 @@ export function Roulette() {
     setWaitingFor(null);
     release(); // recien ahora el saldo se actualiza
     if (closed.status === "Settled") {
-      toasts.show(closed.payout > 0 ? "win" : "loss", closed.payout > 0 ? `Salió el ${closed.winningNumber}. Ganaste ${formatChips(closed.payout)} fichas.` : `Salió el ${closed.winningNumber}.`);
+      if (closed.payout > 0) setWinPopup(closed);
+      else toasts.show("loss", `Salió el ${closed.winningNumber}.`);
     } else if (closed.status === "Rejected") {
       toasts.show("error", failureMessage(closed.failureReason));
     } else {
@@ -139,14 +143,16 @@ export function Roulette() {
 
   const pick = (spot: Spot) => {
     setError(null);
-    setPlaced((current) => (current?.spot.id === spot.id ? { spot, stake: current.stake + chip } : { spot, stake: chip }));
+    setDrops((current) => [...current, { spot, amount: chip }]);
   };
 
   const submit = async () => {
-    if (!placed) return;
+    if (placed.length === 0) return;
     setError(null);
-    const body: PlaceBetBody = { betType: placed.spot.betType, selection: placed.spot.selection, stake: placed.stake };
-    const fingerprint = JSON.stringify(body);
+    const bets: BetLine[] = placed.map((p) => ({ betType: p.spot.betType, selection: p.spot.selection, stake: p.stake }));
+    const body: PlaceBetBody = { bets };
+    // La misma tirada (en cualquier orden) = la misma clave de idempotencia.
+    const fingerprint = JSON.stringify([...bets].map((b) => `${b.betType}:${b.selection.join("-")}:${b.stake}`).sort());
     if (pending.current?.fingerprint !== fingerprint) pending.current = { fingerprint, key: crypto.randomUUID() };
 
     // La rueda empieza a girar ya, sin conocer el resultado, y el saldo se congela hasta que la bola caiga.
@@ -196,12 +202,24 @@ export function Roulette() {
           <Board placed={placed} disabled={spinning} winning={result?.status === "Settled" ? result.winningNumber : null} onPick={pick} />
 
           <div className="summary">
-            {placed ? (
-              <span>
-                {placed.spot.label}: si ganás, cobrás <strong>{formatChips(placed.stake * placed.spot.multiplier)}</strong> fichas (incluye tu apuesta). Tocá de nuevo el mismo lugar para sumar fichas.
-              </span>
+            {placed.length > 0 ? (
+              <>
+                <ul className="bet-list" aria-label="Tus apuestas">
+                  {placed.map((p) => (
+                    <li key={p.spot.id}>
+                      <span>{p.spot.label}</span>
+                      <span className="muted">
+                        {formatChips(p.stake)} fichas · si sale, cobrás {formatChips(p.stake * p.spot.multiplier)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <span>
+                  Total apostado: <strong>{formatChips(stake)}</strong> fichas. Podés apostar a varios lugares a la vez; tocá otra vez el mismo lugar para sumar fichas.
+                </span>
+              </>
             ) : (
-              <span className="muted">Tocá un número o una apuesta del tapete.</span>
+              <span className="muted">Tocá un número o una apuesta del tapete. Podés apostar a varios lugares a la vez.</span>
             )}
           </div>
 
@@ -209,11 +227,16 @@ export function Roulette() {
           {error && <p className="notice notice--error" role="alert">{error}</p>}
 
           <div className="actions">
-            <button type="button" className="btn btn--ghost" disabled={!placed || spinning} onClick={() => setPlaced(null)}>
-              Quitar fichas
-            </button>
+            <span className="actions__group">
+              <button type="button" className="btn btn--ghost" disabled={drops.length === 0 || spinning} onClick={() => setDrops((current) => current.slice(0, -1))}>
+                Deshacer
+              </button>
+              <button type="button" className="btn btn--ghost" disabled={drops.length === 0 || spinning} onClick={() => setDrops([])}>
+                Quitar todo
+              </button>
+            </span>
             <button type="button" className="btn btn--gold btn--lg" disabled={!canBet} onClick={() => void submit()}>
-              {spinning ? "Girando…" : placeBet.isPending ? "Enviando…" : placed ? `Apostar ${formatChips(stake)} fichas` : "Apostar"}
+              {spinning ? "Girando…" : placeBet.isPending ? "Enviando…" : placed.length > 0 ? `Apostar ${formatChips(stake)} fichas` : "Apostar"}
             </button>
           </div>
         </section>
@@ -227,13 +250,28 @@ export function Roulette() {
 
           <h3 className="section-subtitle">Últimos números</h3>
           <div className="strip">
-            {recent.data?.filter((r) => r.winningNumber !== null && r.status === "Settled").slice(0, 10).map((r) => (
+            {/* La tirada en curso no se muestra hasta que la bola se detiene (si no, adelanta el resultado). */}
+            {recent.data?.filter((r) => r.winningNumber !== null && r.status === "Settled" && !(spinning && r.betId === waitingFor)).slice(0, 10).map((r) => (
               <Pocket key={r.betId} number={r.winningNumber!} size="sm" />
             ))}
             {recent.data?.every((r) => r.winningNumber === null) && <span className="muted">Sin tiradas todavía.</span>}
           </div>
         </section>
       </div>
+
+      {winPopup && (
+        <div className="win-modal" role="dialog" aria-modal="true" aria-labelledby="win-title" onClick={() => setWinPopup(null)}>
+          <div className="win-modal__box" onClick={(e) => e.stopPropagation()}>
+            <Pocket number={winPopup.winningNumber ?? 0} size="xl" />
+            <h2 id="win-title" className="win-modal__title">¡Ganaste!</h2>
+            <p className="win-modal__amount">{formatChips(winPopup.payout)} fichas</p>
+            <p className="muted">Salió el {winPopup.winningNumber}. Apostaste {formatChips(winPopup.stake)}.</p>
+            <button type="button" className="btn btn--gold" autoFocus onClick={() => setWinPopup(null)}>
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

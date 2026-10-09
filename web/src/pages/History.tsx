@@ -5,7 +5,7 @@ import { Pocket } from "../components/Pocket";
 import { RoundBadge } from "../components/RoundBadge";
 import { formatChips, formatDateTime } from "../lib/format";
 import { errorMessage, outcomeText } from "../lib/messages";
-import { describeBet } from "../lib/roulette";
+import { describeRound } from "../lib/roulette";
 import { verifyUrl } from "../lib/verify";
 
 export function History() {
@@ -99,7 +99,7 @@ function HistoryRow({ round, link }: { round: Round; link: string | null }) {
     <tr>
       <td>{formatDateTime(round.placedAt)}</td>
       <td>
-        {describeBet(round.betType, round.selection)}
+        {describeRound(round)}
         <span className="muted"> · {formatChips(round.stake)}</span>
       </td>
       <td>{showsNumber ? <Pocket number={round.winningNumber!} size="sm" /> : <span className="muted">—</span>}</td>

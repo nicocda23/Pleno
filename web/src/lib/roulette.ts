@@ -58,6 +58,12 @@ const NAMES: Record<RouletteBetType, string> = {
   High: "19 - 36",
 };
 
+/** Texto de una tirada: la apuesta si es una sola, o cuantas hay. */
+export function describeRound(round: { betType: RouletteBetType; selection: number[]; bets?: { betType: RouletteBetType; selection: number[] }[] }): string {
+  const bets = round.bets ?? [];
+  return bets.length > 1 ? `${bets.length} apuestas` : describeBet(round.betType, round.selection);
+}
+
 /** Texto corto de una apuesta, por ejemplo "Pleno 17" o "Docena 2". */
 export function describeBet(betType: RouletteBetType, selection: number[]): string {
   const name = NAMES[betType];

@@ -71,6 +71,13 @@ public sealed class RouletteFlowTests(PostgresFixture db, RabbitMqFixture rabbit
         return await client.SendAsync(request);
     }
 
+    private static async Task<HttpResponseMessage> PlaceSpinAsync(HttpClient client, object[] bets, string key)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/games/roulette/bets") { Content = JsonContent.Create(new { bets }) };
+        request.Headers.Add("Idempotency-Key", key);
+        return await client.SendAsync(request);
+    }
+
     private static async Task<JsonElement> PlacedAsync(HttpResponseMessage response)
     {
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
@@ -258,6 +265,96 @@ public sealed class RouletteFlowTests(PostgresFixture db, RabbitMqFixture rabbit
 
         var reused = await PlaceAsync(client, "Even", [], 999, "same-key");
         Assert.Equal(HttpStatusCode.Conflict, reused.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_spin_with_several_bets_reserves_the_total_draws_once_and_pays_the_sum()
+    {
+        using var app = StartApp();
+        var (userId, accountId) = await FundedPlayerAsync(app, 1_000);
+        using var client = app.ClientFor(userId);
+
+        // Rojo Y negro a la vez es legal (una de las dos pierde siempre), igual que un pleno y su columna.
+        var placed = await PlacedAsync(await PlaceSpinAsync(
+            client,
+            [
+                new { betType = "Red", selection = Array.Empty<int>(), stake = 100L },
+                new { betType = "Black", selection = Array.Empty<int>(), stake = 50L },
+                new { betType = "Straight", selection = new[] { 7 }, stake = 10L },
+                new { betType = "Column", selection = new[] { 1 }, stake = 40L },
+            ],
+            "spin-1"));
+        var betId = placed.GetProperty("betId").GetGuid();
+
+        await WaitForStatusAsync(client, betId, "Settled");
+
+        var round = await RoundAsync(client, betId);
+        var winning = round.GetProperty("winningNumber").GetInt32();
+        var expected =
+            RouletteBet.Create(RouletteBetType.Red, [], 100).PayoutFor(winning)
+            + RouletteBet.Create(RouletteBetType.Black, [], 50).PayoutFor(winning)
+            + RouletteBet.Create(RouletteBetType.Straight, [7], 10).PayoutFor(winning)
+            + RouletteBet.Create(RouletteBetType.Column, [1], 40).PayoutFor(winning);
+        Assert.Equal(200, round.GetProperty("stake").GetInt64()); // el total apostado
+        Assert.Equal(4, round.GetProperty("bets").GetArrayLength());
+        Assert.Equal(expected, round.GetProperty("payout").GetInt64());
+
+        // Una sola reserva por el total y una sola liquidacion: el saldo cierra exacto.
+        var account = await app.Services.GetRequiredService<WalletService>().GetAsync(accountId);
+        Assert.Equal((1_000 - 200 + expected, 0L), (account.Available, account.Reserved));
+    }
+
+    [Fact]
+    public async Task A_spin_is_rejected_whole_when_the_total_exceeds_the_balance()
+    {
+        using var app = StartApp();
+        var (userId, accountId) = await FundedPlayerAsync(app, 100);
+        using var client = app.ClientFor(userId);
+
+        var placed = await PlacedAsync(await PlaceSpinAsync(
+            client,
+            [new { betType = "Red", selection = Array.Empty<int>(), stake = 60L }, new { betType = "Odd", selection = Array.Empty<int>(), stake = 60L }],
+            "spin-big"));
+
+        await WaitForStatusAsync(client, placed.GetProperty("betId").GetGuid(), "Rejected");
+        var account = await app.Services.GetRequiredService<WalletService>().GetAsync(accountId);
+        Assert.Equal((100L, 0L), (account.Available, account.Reserved)); // ninguna de las dos se jugo
+    }
+
+    [Fact]
+    public async Task Retrying_a_spin_in_another_order_is_the_same_spin_but_other_content_is_a_conflict()
+    {
+        using var app = StartApp();
+        var (userId, _) = await FundedPlayerAsync(app, 1_000);
+        using var client = app.ClientFor(userId);
+        var red = new { betType = "Red", selection = Array.Empty<int>(), stake = 10L };
+        var seven = new { betType = "Straight", selection = new[] { 7 }, stake = 10L };
+
+        var first = await PlacedAsync(await PlaceSpinAsync(client, [red, seven], "spin-retry"));
+        var again = await PlacedAsync(await PlaceSpinAsync(client, [seven, red], "spin-retry"));
+
+        Assert.Equal(first.GetProperty("betId").GetGuid(), again.GetProperty("betId").GetGuid());
+        Assert.True(again.GetProperty("alreadyPlaced").GetBoolean());
+        Assert.Equal(HttpStatusCode.Conflict, (await PlaceSpinAsync(client, [red], "spin-retry")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_spin_with_an_invalid_bet_inside_is_rejected_before_anything_is_reserved()
+    {
+        using var app = StartApp();
+        var (userId, accountId) = await FundedPlayerAsync(app, 1_000);
+        using var client = app.ClientFor(userId);
+
+        var response = await PlaceSpinAsync(
+            client,
+            [new { betType = "Red", selection = Array.Empty<int>(), stake = 10L }, new { betType = "Straight", selection = new[] { 99 }, stake = 10L }],
+            "spin-bad");
+        var empty = await PlaceSpinAsync(client, [], "spin-empty");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, empty.StatusCode);
+        var account = await app.Services.GetRequiredService<WalletService>().GetAsync(accountId);
+        Assert.Equal((1_000L, 0L), (account.Available, account.Reserved));
     }
 
     [Fact]

@@ -54,5 +54,5 @@ web/e2e/       recorridos con navegador real
 ## Qué hay hoy
 - Login/logout con Keycloak, saldo en vivo con indicador de conexión, tema claro y oscuro.
 - Lobby con catálogo (Ruleta disponible; el resto "Próximamente") y últimas jugadas.
-- Mesa de ruleta: tapete completo (los 37 números, caballos, calles, cuadros, seisenas, docenas, columnas y chances simples) y rueda animada con PixiJS. Una apuesta por tirada.
+- Mesa de ruleta: tapete completo (los 37 números, caballos, calles, cuadros, seisenas, docenas, columnas y chances simples) y rueda animada con PixiJS. Se puede apostar a varios lugares en la misma tirada (con "Deshacer" y "Quitar todo").
 - Historial con verificación: revelar la semilla y abrir la página pública `/verify` ya completa.

@@ -23,6 +23,12 @@ public sealed class GamesDomainException(GamesError error, string message) : Exc
 
 public sealed record PlaceRouletteBetRequest(Guid UserId, Guid AccountId, RouletteBetType BetType, IReadOnlyList<int> Selection, long Stake);
 
+/// <summary>Una apuesta dentro de una tirada.</summary>
+public sealed record BetLine(RouletteBetType BetType, IReadOnlyList<int> Selection, long Stake);
+
+/// <summary>Una tirada con una o varias apuestas: comparten nonce, numero sorteado y reserva.</summary>
+public sealed record PlaceRouletteSpinRequest(Guid UserId, Guid AccountId, IReadOnlyList<BetLine> Bets);
+
 /// <summary>Resultado de colocar una apuesta. La resolucion es asincrona: se consulta la ronda por su BetId.</summary>
 public sealed record PlacedBet(Guid BetId, RoundStatus Status, long Nonce, string Commitment, string ClientSeed, bool AlreadyPlaced);
 
@@ -37,11 +43,24 @@ public sealed partial class RouletteService(
     TimeProvider clock,
     ILogger<RouletteService> logger)
 {
+    /// <summary>Maximo de apuestas en una tirada: alcanza para cubrir todo el tapete (157 lugares) y acota el tamaño de la ronda.</summary>
+    public const int MaxBetsPerSpin = 200;
+
+    /// <summary>Coloca una apuesta suelta (una tirada de una sola apuesta).</summary>
+    public Task<PlacedBet> PlaceBetAsync(PlaceRouletteBetRequest request, string idempotencyKey, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return PlaceSpinAsync(
+            new PlaceRouletteSpinRequest(request.UserId, request.AccountId, [new BetLine(request.BetType, request.Selection, request.Stake)]),
+            idempotencyKey,
+            ct);
+    }
+
     /// <summary>
-    /// Coloca una apuesta. En UNA transaccion: asigna el nonce (lo decide el servidor), guarda la ronda y encola la orden
-    /// de reserva a la Wallet. Es idempotente: la misma IdempotencyKey de la misma cuenta devuelve la misma apuesta.
+    /// Coloca una tirada. En UNA transaccion: asigna el nonce (lo decide el servidor), guarda la ronda y encola la orden
+    /// de reserva a la Wallet por el TOTAL apostado. Es idempotente: la misma IdempotencyKey de la misma cuenta devuelve la misma tirada.
     /// </summary>
-    public async Task<PlacedBet> PlaceBetAsync(PlaceRouletteBetRequest request, string idempotencyKey, CancellationToken ct = default)
+    public async Task<PlacedBet> PlaceSpinAsync(PlaceRouletteSpinRequest request, string idempotencyKey, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrWhiteSpace(idempotencyKey) || idempotencyKey.Length > 128)
@@ -49,13 +68,32 @@ public sealed partial class RouletteService(
             throw new GamesDomainException(GamesError.InvalidIdempotencyKey, "La IdempotencyKey es obligatoria y de hasta 128 caracteres.");
         }
 
-        if (!RouletteBet.TryCreate(request.BetType, request.Selection, request.Stake, out _))
+        if (request.Bets is null || request.Bets.Count is 0 or > MaxBetsPerSpin)
         {
-            throw new GamesDomainException(GamesError.InvalidBet, $"Apuesta invalida: {request.BetType} con esa seleccion y apuesta {request.Stake}.");
+            throw new GamesDomainException(GamesError.InvalidBet, $"Una tirada lleva entre 1 y {MaxBetsPerSpin} apuestas.");
+        }
+
+        long total = 0;
+        foreach (var line in request.Bets)
+        {
+            if (!RouletteBet.TryCreate(line.BetType, line.Selection, line.Stake, out _))
+            {
+                throw new GamesDomainException(GamesError.InvalidBet, $"Apuesta invalida: {line.BetType} con esa seleccion y apuesta {line.Stake}.");
+            }
+
+            try
+            {
+                total = checked(total + line.Stake);
+            }
+            catch (OverflowException)
+            {
+                throw new GamesDomainException(GamesError.InvalidBet, "El total apostado es demasiado grande.");
+            }
         }
 
         var betId = BetIdFor(request.AccountId, idempotencyKey);
         var now = clock.GetUtcNow();
+        var bets = request.Bets.Select(line => new RoundBet { BetType = line.BetType, Selection = [.. line.Selection], Stake = line.Stake }).ToList();
 
         var allocation = await fairness.AllocateNonceAsync(
             request.UserId,
@@ -67,16 +105,17 @@ public sealed partial class RouletteService(
                     Id = betId,
                     UserId = request.UserId,
                     AccountId = request.AccountId,
-                    BetType = request.BetType,
-                    Selection = [.. request.Selection],
-                    Stake = request.Stake,
+                    BetType = bets[0].BetType,
+                    Selection = [.. bets[0].Selection],
+                    Stake = total,
+                    Bets = bets,
                     PairId = nonce.PairId,
                     Nonce = nonce.Nonce,
                     Status = RoundStatus.Placed,
                     PlacedAt = now,
                 });
 
-                await outboxSession.PublishAsync(new ReserveStake(betId, request.AccountId, request.Stake));
+                await outboxSession.PublishAsync(new ReserveStake(betId, request.AccountId, total));
             },
             ct);
 
@@ -86,9 +125,9 @@ public sealed partial class RouletteService(
             var existing = await GetRoundAsync(betId, ct);
             if (existing.AccountId != request.AccountId
                 || existing.UserId != request.UserId
-                || existing.BetType != request.BetType
-                || existing.Stake != request.Stake
-                || !existing.Selection.Order().SequenceEqual(request.Selection.Order()))
+                || existing.Stake != total
+                || !Canonical(existing.AllBets().Select(b => (b.BetType, (IReadOnlyList<int>)b.Selection, b.Stake)))
+                    .SequenceEqual(Canonical(request.Bets.Select(b => (b.BetType, b.Selection, b.Stake)))))
             {
                 throw new GamesDomainException(GamesError.BetKeyReused, "La IdempotencyKey ya se uso con otra apuesta.");
             }
@@ -98,6 +137,10 @@ public sealed partial class RouletteService(
 
         return new PlacedBet(betId, RoundStatus.Placed, allocation.Nonce, allocation.Commitment, allocation.ClientSeed, AlreadyPlaced: false);
     }
+
+    /// <summary>Forma comparable de una lista de apuestas: no depende del orden ni del orden de la seleccion.</summary>
+    private static IEnumerable<string> Canonical(IEnumerable<(RouletteBetType Type, IReadOnlyList<int> Selection, long Stake)> bets) =>
+        bets.Select(b => $"{b.Type}:{string.Join('-', b.Selection.Order())}:{b.Stake}").Order(StringComparer.Ordinal);
 
     public async Task<RouletteRound> GetRoundAsync(Guid betId, CancellationToken ct = default)
     {
@@ -134,7 +177,7 @@ public sealed partial class RouletteService(
         }
 
         var inputs = await fairness.GetDrawInputsAsync(round.UserId, round.Id, ct);
-        var outcome = RouletteGame.Play(round.ToBet(), inputs.ServerSeed, inputs.ClientSeed, inputs.Nonce);
+        var outcome = RouletteGame.PlayMany(round.ToBets(), inputs.ServerSeed, inputs.ClientSeed, inputs.Nonce);
         round.MarkResolved(outcome.WinningNumber, outcome.Payout);
         session.Store(round);
 
