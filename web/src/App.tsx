@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 import { ApiProvider } from "./api/ApiProvider";
 import { RequireAuth } from "./auth/RequireAuth";
+import { Admin } from "./pages/Admin";
 import { AuthCallback } from "./pages/AuthCallback";
 import { History } from "./pages/History";
 import { Lobby } from "./pages/Lobby";
@@ -20,6 +21,7 @@ export function App() {
           <Route index element={<Lobby />} />
           <Route path="ruleta" element={<Suspense fallback={<p className="muted" role="status">Cargando la ruleta…</p>}><Roulette /></Suspense>} />
           <Route path="historial" element={<History />} />
+          <Route path="admin" element={<Admin />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -62,7 +62,7 @@ describe("Roulette table", () => {
 
     act(() => hub.emit("roundClosed", closedNotice({})));
 
-    expect(await screen.findByText("Ganaste 100 fichas")).toBeInTheDocument();
+    expect(await screen.findByText("Ganaste 50 fichas")).toBeInTheDocument();
     expect(screen.getAllByText(/Salió el 17/).length).toBeGreaterThanOrEqual(1); // aviso emergente y panel de resultado
     expect(screen.queryByText(/La ruleta está girando/)).not.toBeInTheDocument();
     expect(screen.getByTestId("wheel")).toHaveAttribute("data-state", "settled");
@@ -158,6 +158,18 @@ describe("Roulette table", () => {
     expect(await screen.findByText("No hubo suerte esta vez")).toBeInTheDocument();
   });
 
+  it("does not celebrate when the payout only returns the stake (net win is 0)", async () => {
+    const { hub } = renderApp(<Roulette />, { api: apiWith() });
+    await bet("Pleno 7");
+    await userEvent.click(screen.getByRole("button", { name: /Apostar/ }));
+    await screen.findByText(/La ruleta está girando/);
+
+    act(() => hub.emit("roundClosed", closedNotice({ winningNumber: 1, stake: 20, payout: 20 })));
+
+    expect(await screen.findByText("No hubo suerte esta vez")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("explains a rejected bet in plain language and stops the wheel", async () => {
     const { hub } = renderApp(<Roulette />, { api: apiWith() });
     await bet("Pleno 7");
@@ -233,7 +245,7 @@ describe("Roulette table", () => {
     await userEvent.click(screen.getByRole("button", { name: /Apostar/ }));
     await screen.findByText(/La ruleta está girando/);
     act(() => hub.emit("roundClosed", closedNotice({ winningNumber: 1, stake: 10, payout: 20 })));
-    await screen.findByText("Ganaste 20 fichas");
+    await screen.findByText("Ganaste 10 fichas");
     await waitFor(() => expect(screen.getByRole("button", { name: /Apostar/ })).toBeEnabled());
     await userEvent.click(screen.getByRole("button", { name: /Apostar/ }));
 
@@ -268,7 +280,7 @@ describe("Roulette table", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Apostar/ }));
 
-    expect(await screen.findByText("Ganaste 20 fichas", {}, { timeout: 5_000 })).toBeInTheDocument();
+    expect(await screen.findByText("Ganaste 10 fichas", {}, { timeout: 5_000 })).toBeInTheDocument();
   }, 10_000);
 
   it("lands the ball as soon as the number is drawn, but waits for the payout before revealing the result", async () => {
@@ -288,7 +300,7 @@ describe("Roulette table", () => {
 
     act(() => hub.emit("roundClosed", closedNotice({ winningNumber: 3, stake: 10, payout: 20 })));
 
-    expect(await screen.findByText("Ganaste 20 fichas")).toBeInTheDocument();
+    expect(await screen.findByText("Ganaste 10 fichas")).toBeInTheDocument();
   });
 });
 
@@ -310,7 +322,7 @@ describe("Roulette animation", () => {
     expect(["spinning", "landing"]).toContain(screen.getByTestId("wheel").getAttribute("data-state"));
 
     // Cuando se asienta, recien ahi aparece.
-    expect(await screen.findByText("Ganaste 360 fichas", {}, { timeout: 8_000 })).toBeInTheDocument();
+    expect(await screen.findByText("Ganaste 350 fichas", {}, { timeout: 8_000 })).toBeInTheDocument();
     expect(screen.getByTestId("wheel")).toHaveAttribute("data-state", "settled");
   }, 15_000);
 });

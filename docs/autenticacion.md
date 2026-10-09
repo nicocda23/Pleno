@@ -54,4 +54,17 @@ Luego `curl -H "Authorization: Bearer <access_token>" http://localhost:5188/me`.
 | `GET /fairness/me`, `POST /fairness/me/rotate` | player | Mis seeds (compromiso) y rotacion |
 | `POST /games/roulette/bets` (`Idempotency-Key`) | player | Apostar; el servidor asigna el nonce |
 | `GET /games/roulette/rounds`, `GET /games/roulette/rounds/{id}` | player | Mi historial y una ronda propia |
-| `GET /backoffice/wallet/users/{id}`, `.../balance`, `POST .../credit` | backoffice | Consulta y ajuste manual |
+| `GET /backoffice/users` | backoffice | Jugadores registrados (id y fecha de alta) para el panel `/admin` |
+| `GET /backoffice/wallet/users/{id}`, `.../balance`, `POST .../credit` | backoffice | Consulta y ajuste manual (cada carga queda en la auditoria) |
+| `GET /backoffice/wallet/audit?limit=` | backoffice | Registro de auditoria: quien cargo fichas, a quien, cuanto y cuando |
+
+## Panel de administracion (`/admin`)
+El rol `backoffice` es el de administrador: ve el enlace **Admin** en el menu y puede cargar fichas a cualquier jugador (cada carga lleva
+`Idempotency-Key`). Como Keycloak solo importa el realm la primera vez, para dar el rol a un usuario que ya existe se asigna en la consola
+de Keycloak (Users > usuario > Role mapping > `backoffice`) o con la API de administracion. El usuario conserva `player`, asi que puede seguir jugando.
+
+### Auditoria de las cargas
+Cada carga manual guarda una anotacion (`AuditEntry`, esquema de la Wallet): administrador, jugador, monto, `Idempotency-Key`, id de la
+transaccion y fecha. Solo ids, nunca nombre ni email. Es de solo-agregar y esta protegida por la misma idempotencia que la carga: repetir
+la misma carga no duplica la anotacion, y si fallo entre la carga y su anotacion, reintentar con la misma clave completa la que faltaba.
+Las cargas rechazadas (monto invalido, cuenta inexistente) no dejan anotacion. La doble aprobacion llega en la fase 5.

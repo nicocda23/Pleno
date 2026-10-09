@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRound, usePlaceBet, useRounds } from "../api/hooks";
 import type { BetLine, PlaceBetBody, Round, RoundClosedNotice } from "../api/types";
 import { Board } from "../components/Board";
+import { Confetti } from "../components/Confetti";
 import { Pocket } from "../components/Pocket";
 import { useToasts } from "../components/Toasts";
 import { WheelCanvas } from "../components/WheelCanvas";
@@ -9,6 +10,7 @@ import { aggregateChips, totalStake, type ChipDrop, type Spot } from "../lib/boa
 import { formatChips } from "../lib/format";
 import { errorMessage, failureMessage } from "../lib/messages";
 import { pocketColor } from "../lib/roulette";
+import { playWinSound } from "../lib/winSound";
 import { useWheelClock } from "../lib/useWheelClock";
 import { WheelModel } from "../lib/wheel";
 import { useRealtime } from "../realtime/RealtimeProvider";
@@ -28,7 +30,10 @@ interface Result {
   failureReason: string | null;
 }
 
-const fromNotice = (n: RoundClosedNotice): Result => ({ ...n });
+/** Ganancia neta: lo cobrado menos lo apostado (200*2 - 250 = 150). Solo si es > 0 se celebra. */
+const netWin = (r: Result) => r.payout - r.stake;
+
+const fromNotice =(n: RoundClosedNotice): Result => ({ ...n });
 const fromRound = (r: Round): Result => ({
   betId: r.betId,
   status: r.status as Result["status"],
@@ -78,7 +83,10 @@ export function Roulette() {
     setWaitingFor(null);
     release(); // recien ahora el saldo se actualiza
     if (closed.status === "Settled") {
-      if (closed.payout > 0) setWinPopup(closed);
+      if (netWin(closed) > 0) {
+        setWinPopup(closed);
+        playWinSound();
+      }
       else toasts.show("loss", `Salió el ${closed.winningNumber}.`);
     } else if (closed.status === "Rejected") {
       toasts.show("error", failureMessage(closed.failureReason));
@@ -273,11 +281,12 @@ export function Roulette() {
 
       {winPopup && (
         <div className="win-modal" role="dialog" aria-modal="true" aria-labelledby="win-title" onClick={() => setWinPopup(null)}>
+          <Confetti />
           <div className="win-modal__box" onClick={(e) => e.stopPropagation()}>
             <Pocket number={winPopup.winningNumber ?? 0} size="xl" />
             <h2 id="win-title" className="win-modal__title">¡Ganaste!</h2>
-            <p className="win-modal__amount">{formatChips(winPopup.payout)} fichas</p>
-            <p className="muted">Salió el {winPopup.winningNumber}. Apostaste {formatChips(winPopup.stake)}.</p>
+            <p className="win-modal__amount">{formatChips(netWin(winPopup))} fichas</p>
+            <p className="muted">Salió el {winPopup.winningNumber}. Apostaste {formatChips(winPopup.stake)} y cobraste {formatChips(winPopup.payout)}.</p>
             <button type="button" className="btn btn--gold" autoFocus onClick={() => setWinPopup(null)}>
               Continuar
             </button>
@@ -306,13 +315,14 @@ function ResultView({ result }: { result: Result }) {
     );
   }
 
-  const won = result.payout > 0;
+  const net = netWin(result);
+  const won = net > 0;
   const color = pocketColor(result.winningNumber ?? 0);
   return (
     <div className={`outcome ${won ? "outcome--win" : "outcome--loss"}`}>
       <Pocket number={result.winningNumber ?? 0} size="xl" />
-      <p className="outcome__title">{won ? `Ganaste ${formatChips(result.payout)} fichas` : "No hubo suerte esta vez"}</p>
-      <p className="muted">Salió el {result.winningNumber} ({color === "red" ? "rojo" : color === "black" ? "negro" : "verde"}). Apostaste {formatChips(result.stake)}.</p>
+      <p className="outcome__title">{won ? `Ganaste ${formatChips(net)} fichas` : "No hubo suerte esta vez"}</p>
+      <p className="muted">Salió el {result.winningNumber} ({color === "red" ? "rojo" : color === "black" ? "negro" : "verde"}). Apostaste {formatChips(result.stake)} y cobraste {formatChips(result.payout)}.</p>
     </div>
   );
 }

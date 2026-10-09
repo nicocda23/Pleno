@@ -9,6 +9,9 @@ namespace Casino.Modules.Wallet.Api;
 
 public sealed record CreditRequest(long Amount);
 
+public sealed record AuditEntryResponse(
+    string Action, Guid ActorUserId, Guid TargetUserId, long Amount, Guid TransactionId, DateTimeOffset OccurredAt);
+
 public sealed record OperationResponse(Guid TransactionId, bool IsDuplicate);
 
 public sealed record AccountResponse(
@@ -48,10 +51,10 @@ internal static class WalletEndpoints
         backoffice.MapGet("/users/{userId:guid}/balance", (Guid userId, DateTimeOffset asOf, WalletService wallet, CancellationToken ct) =>
             GetBalanceAsync(userId, asOf, wallet, ct));
 
-        // Ajuste manual de saldo. La doble aprobacion y el registro de auditoria llegan en la fase 5.
-        backoffice.MapPost("/users/{userId:guid}/credit", async (Guid userId, HttpRequest http, CreditRequest body, WalletService wallet, CancellationToken ct) =>
+        // Ajuste manual de saldo; queda anotado en el registro de auditoria. La doble aprobacion llega en la fase 5.
+        backoffice.MapPost("/users/{userId:guid}/credit", async (Guid userId, HttpContext context, CreditRequest body, WalletService wallet, BackofficeAudit audit, CancellationToken ct) =>
         {
-            var key = http.Headers[IdempotencyHeader].ToString();
+            var key = context.Request.Headers[IdempotencyHeader].ToString();
             if (string.IsNullOrWhiteSpace(key))
             {
                 return Results.Problem(
@@ -60,8 +63,18 @@ internal static class WalletEndpoints
                     detail: $"El header {IdempotencyHeader} es obligatorio.");
             }
 
-            var outcome = await wallet.CreditAsync(PlayerIds.WalletAccountFor(userId), key, body.Amount, ct);
+            var accountId = PlayerIds.WalletAccountFor(userId);
+            var outcome = await wallet.CreditAsync(accountId, key, body.Amount, ct);
+            // Tambien si fue un duplicado: asi un reintento completa la anotacion si fallo la primera vez.
+            await audit.RecordCreditAsync(context.User.GetUserId(), userId, accountId, body.Amount, key, outcome.TransactionId, ct);
             return Results.Ok(new OperationResponse(outcome.TransactionId, outcome.IsDuplicate));
+        });
+
+        // Registro de auditoria: quien cargo fichas, a quien y cuando.
+        backoffice.MapGet("/audit", async (int? limit, BackofficeAudit audit, CancellationToken ct) =>
+        {
+            var entries = await audit.ListAsync(Math.Clamp(limit ?? 50, 1, 200), ct);
+            return Results.Ok(entries.Select(e => new AuditEntryResponse(e.Action, e.ActorUserId, e.TargetUserId, e.Amount, e.TransactionId, e.OccurredAt)));
         });
     }
 

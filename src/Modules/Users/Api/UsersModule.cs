@@ -11,6 +11,8 @@ namespace Casino.Modules.Users.Api;
 
 public sealed record MeResponse(Guid UserId, string? DisplayName, IReadOnlyList<string> Roles, Guid AccountId, DateTimeOffset RegisteredAt);
 
+public sealed record UserSummary(Guid UserId, DateTimeOffset RegisteredAt);
+
 public static class UsersModule
 {
     public static IServiceCollection AddUsersModule(this IServiceCollection services)
@@ -54,6 +56,15 @@ public static class UsersModule
             })
             .RequireAuthorization(policy => policy.RequireRole(Roles.Player))
             .WithTags("Users");
+
+        // Panel de administracion: quien puede recibir fichas. La cuenta se acredita con /backoffice/wallet/users/{id}/credit.
+        app.MapGet("/backoffice/users", async (int? limit, UserService users, CancellationToken ct) =>
+            {
+                var profiles = await users.ListAsync(Math.Clamp(limit ?? 100, 1, 500), ct);
+                return Results.Ok(profiles.Select(p => new UserSummary(p.Id, p.RegisteredAt)));
+            })
+            .RequireAuthorization(policy => policy.RequireRole(Roles.Backoffice))
+            .WithTags("Backoffice");
 
         return app;
     }

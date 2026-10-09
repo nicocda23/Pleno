@@ -286,3 +286,37 @@ a { color: inherit; }
 .win-modal__title { margin: 0; font-family: var(--font-display); font-size: 1.8rem; color: var(--gold-soft); }
 .win-modal__amount { margin: 0; font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Celebracion de victoria */
+.win-modal__box { animation: win-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1); }
+.win-modal__amount { animation: win-pulse 1s ease-in-out 0.4s 3; }
+.win-modal__title { text-shadow: 0 0 18px color-mix(in srgb, var(--gold) 60%, transparent); }
+.confetti { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 61; }
+.confetti__piece { position: absolute; top: -12px; width: 8px; height: 14px; border-radius: 2px; opacity: 0; animation: confetti-fall linear forwards; }
+@keyframes win-pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes win-pulse { 50% { transform: scale(1.12); color: var(--gold-soft); } }
+@keyframes confetti-fall {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate3d(var(--drift), 105vh, 0) rotate(720deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confetti { display: none; }
+  .win-modal__box, .win-modal__amount { animation: none; }
+}
+
+/* Panel de administracion */
+.admin-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 800px) { .admin-grid { grid-template-columns: 1.2fr 1fr; align-items: start; } }
+.admin-users { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 420px; overflow: auto; }
+.admin-user { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 10px 12px; text-align: left; font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.admin-user--on { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+.admin-user__id { font-family: ui-monospace, monospace; font-weight: 700; }
+.admin-user__me { font-size: 0.75rem; padding: 1px 8px; border-radius: 999px; background: var(--gold); color: var(--gold-ink); font-weight: 800; }
+.admin-quick { display: flex; gap: 8px; flex-wrap: wrap; }
+.field { display: grid; gap: 6px; }
+.field input { padding: 10px 12px; font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; }
+.admin-audit-scroll { overflow-x: auto; }
+.admin-audit { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.admin-audit th, .admin-audit td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.admin-audit .num { text-align: right; }
+.admin-audit .mono { font-family: ui-monospace, monospace; }

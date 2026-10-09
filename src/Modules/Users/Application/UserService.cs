@@ -12,6 +12,13 @@ public sealed class UserService(IDocumentStore store, IOutboxFactory outbox, Tim
 {
     private readonly ConcurrentDictionary<Guid, UserProfile> _known = new();
 
+    /// <summary>Jugadores dados de alta, los mas recientes primero. Solo ids y fecha: no hay datos personales que mostrar.</summary>
+    public async Task<IReadOnlyList<UserProfile>> ListAsync(int limit, CancellationToken ct = default)
+    {
+        await using var read = store.QuerySession();
+        return await read.Query<UserProfile>().OrderByDescending(p => p.RegisteredAt).Take(limit).ToListAsync(ct);
+    }
+
     /// <summary>
     /// Alta automatica al primer ingreso. Si el usuario es nuevo, en UNA transaccion se guarda su perfil y se encola
     /// <see cref="UserRegistered"/> (la Wallet le abre la cuenta y le acredita las fichas de bienvenida).

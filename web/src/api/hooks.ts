@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./ApiProvider";
 import { ApiError } from "./client";
-import type { Account, FairnessInfo, Me, PlaceBetBody, PlacedBet, Round } from "./types";
+import type { Account, AuditEntry, CreditResult, FairnessInfo, Me, PlaceBetBody, PlacedBet, Round, UserSummary } from "./types";
 
 export const queryKeys = {
   me: ["me"] as const,
@@ -9,7 +9,12 @@ export const queryKeys = {
   rounds: (limit: number) => ["rounds", limit] as const,
   roundsAll: ["rounds"] as const,
   fairness: ["fairness"] as const,
+  adminUsers: ["admin", "users"] as const,
+  adminAudit: ["admin", "audit"] as const,
+  adminAccount: (userId: string) => ["admin", "account", userId] as const,
 };
+
+export const BACKOFFICE_ROLE = "backoffice";
 
 /** Datos del usuario autenticado. Llamarlo tambien da de alta al jugador la primera vez. */
 export function useMe() {
@@ -71,4 +76,41 @@ export function useRound(betId: string | null) {
       return status === "Settled" || status === "Rejected" || status === "Voided" ? false : 3_000;
     },
   });
+}
+
+/** Jugadores registrados. Solo responde a quien tenga el rol de administrador. */
+export function useAdminUsers(enabled: boolean) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.adminUsers, queryFn: () => api.get<UserSummary[]>("/backoffice/users"), enabled });
+}
+
+/** Cuenta de cualquier jugador (solo administrador). */
+export function useAdminAccount(userId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.adminAccount(userId ?? ""),
+    queryFn: () => api.get<Account>(`/backoffice/wallet/users/${userId}`),
+    enabled: userId !== null,
+  });
+}
+
+/** Carga fichas a un jugador. La clave de idempotencia la pone quien llama: reintentar el mismo envio no duplica la carga. */
+export function useCreditChips() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, amount, idempotencyKey }: { userId: string; amount: number; idempotencyKey: string }) =>
+      api.post<CreditResult>(`/backoffice/wallet/users/${userId}/credit`, { amount }, { "Idempotency-Key": idempotencyKey }),
+    onSuccess: (_result, { userId }) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.adminAccount(userId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.adminAudit }),
+      ]),
+  });
+}
+
+/** Registro de auditoria: quien cargo fichas, a quien y cuando (las mas recientes primero). */
+export function useAdminAudit(enabled: boolean) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.adminAudit, queryFn: () => api.get<AuditEntry[]>("/backoffice/wallet/audit?limit=50"), enabled });
 }

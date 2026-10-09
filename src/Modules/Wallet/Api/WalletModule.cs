@@ -29,6 +29,7 @@ public static class WalletModule
                 outbox: sp.GetRequiredService<IOutboxFactory>(),
                 reservationTtl: ttl);
         });
+        services.AddSingleton<BackofficeAudit>();
         return services;
     }
 

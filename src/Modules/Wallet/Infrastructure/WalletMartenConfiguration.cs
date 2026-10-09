@@ -1,3 +1,4 @@
+using Casino.Modules.Wallet.Application;
 using Casino.Modules.Wallet.Domain;
 using JasperFx;
 using Marten;
@@ -33,6 +34,8 @@ public static class WalletMartenConfiguration
         ]);
 
         options.Schema.For<IdempotencyRecord>().Identity(r => r.Id);
+        options.Schema.For<AuditEntry>().Identity(e => e.Id);
+        options.Schema.For<AuditEntry>().Index(e => e.OccurredAt);
     }
 }
 

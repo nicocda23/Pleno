@@ -1,5 +1,26 @@
 // Contratos de la API (JSON en camelCase). Las fichas son siempre enteros: nunca decimales.
 
+/** Un jugador visto desde el panel de administracion: solo id y fecha de alta (no hay datos personales). */
+export interface UserSummary {
+  userId: string;
+  registeredAt: string;
+}
+
+/** Una anotacion del registro de auditoria del backoffice. */
+export interface AuditEntry {
+  action: string;
+  actorUserId: string;
+  targetUserId: string;
+  amount: number;
+  transactionId: string;
+  occurredAt: string;
+}
+
+export interface CreditResult {
+  transactionId: string;
+  isDuplicate: boolean;
+}
+
 export interface Me {
   userId: string;
   displayName: string | null;

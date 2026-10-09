@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { BACKOFFICE_ROLE, useMe } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime, type ConnectionState } from "../realtime/RealtimeProvider";
 import { useTheme } from "../theme/ThemeProvider";
@@ -15,6 +16,7 @@ export function Layout() {
   const { displayName, logout } = useAuth();
   const { connection } = useRealtime();
   const { theme, toggle } = useTheme();
+  const isAdmin = useMe().data?.roles.includes(BACKOFFICE_ROLE) ?? false;
 
   return (
     <div className="shell">
@@ -31,6 +33,7 @@ export function Layout() {
           <NavLink to="/" end>Lobby</NavLink>
           <NavLink to="/ruleta">Ruleta</NavLink>
           <NavLink to="/historial">Historial</NavLink>
+          {isAdmin && <NavLink to="/admin">Admin</NavLink>}
         </nav>
 
         <div className="topbar__right">
