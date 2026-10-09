@@ -168,6 +168,49 @@ export interface Paytable {
   hitRatePercent: number;
 }
 
+/** Una tabla de pagos de la tragamonedas tal como la ve el administrador. */
+export interface SlotsSettingsView {
+  symbols: PaytableSymbol[];
+  leadingPays: LeadingPay[];
+  maxStake: number;
+  totalWeight: number;
+  returnToPlayerPercent: number;
+  hitRatePercent: number;
+}
+
+/** Ajustes vigentes (con su version) y los de la configuracion, a los que se puede volver. */
+export interface SlotsSettings {
+  version: number;
+  current: SlotsSettingsView;
+  baseline: SlotsSettingsView;
+}
+
+/** Lo que se envia para probar o publicar una tabla. `baseVersion` es la version que se estaba mirando. */
+export interface SlotsSettingsBody {
+  symbols: PaytableSymbol[];
+  leadingPays: LeadingPay[];
+  maxStake: number;
+  baseVersion: number;
+}
+
+export interface SlotsSettingsPreview {
+  valid: boolean;
+  error: string | null;
+  returnToPlayerPercent: number | null;
+  hitRatePercent: number | null;
+  totalWeight: number | null;
+}
+
+export interface SlotsSettingsHistoryItem {
+  version: number;
+  changedBy: string;
+  changedAt: string;
+  returnToPlayerPercent: number;
+  hitRatePercent: number;
+  maxStake: number;
+  symbols: number;
+}
+
 export interface RetiredPair {
   pairId: string;
   commitment: string;

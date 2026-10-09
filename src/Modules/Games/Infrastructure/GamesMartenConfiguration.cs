@@ -23,5 +23,6 @@ public static class GamesMartenConfiguration
         // Dos manejadores que procesen el mismo mensaje a la vez no pueden pisarse: el segundo falla y reintenta.
         options.Schema.For<RouletteRound>().Identity(r => r.Id).UseOptimisticConcurrency(true).Index(r => r.UserId);
         options.Schema.For<SlotsSpin>().Identity(s => s.Id).UseOptimisticConcurrency(true).Index(s => s.UserId);
+        options.Schema.For<SlotsSettingsVersion>().Identity(v => v.Id).Index(v => v.Version);
     }
 }
