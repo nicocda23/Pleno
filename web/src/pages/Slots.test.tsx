@@ -96,8 +96,47 @@ describe("Slots", () => {
 
     expect(await screen.findByRole("dialog", { name: "¡Ganaste!" })).toBeInTheDocument();
     expect(within(screen.getByRole("dialog")).getByText(/450 fichas/)).toBeInTheDocument(); // ganancia neta: 500 - 50
-    expect(symbolsShown()).toEqual(["Limon", "Limon", "Limon"]);
+    await waitFor(() => expect(symbolsShown()).toEqual(["Limon", "Limon", "Limon"])); // ReelsView copia el modelo en un requestAnimationFrame
     expect(screen.getByTestId("reels")).toHaveAttribute("data-state", "settled");
+  });
+
+  it("plays automatically until stopped, using a different idempotency key per spin", async () => {
+    let n = 0;
+    const api = apiWith({
+      "POST /games/slots/spins": () => placed(`bet-${++n}`),
+      "GET /games/slots/spins/bet-1": () => spinState({ betId: "bet-1" }),
+      "GET /games/slots/spins/bet-2": () => spinState({ betId: "bet-2" }),
+      "GET /games/slots/spins/bet-3": () => spinState({ betId: "bet-3" }),
+    });
+    renderApp(<Slots />, { api });
+    await ready();
+
+    await userEvent.click(screen.getByRole("button", { name: "10 giros" }));
+    await waitFor(() => expect(spinCalls(api).length).toBeGreaterThanOrEqual(2), { timeout: 4000 });
+    await userEvent.click(await screen.findByRole("button", { name: /Detener/ }));
+
+    const keys = spinCalls(api).map((c) => c.headers?.["Idempotency-Key"]);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(await screen.findByRole("button", { name: "10 giros" })).toBeInTheDocument();
+  });
+
+  it("disables automatic play options the balance cannot cover", async () => {
+    renderApp(<Slots />, { api: apiWith({}, 300) }); // 300 fichas a 10 por giro = 30 giros
+    await ready();
+
+    expect(screen.getByRole("button", { name: "10 giros" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "25 giros" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "50 giros" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "100 giros" })).toBeDisabled();
+    expect(screen.getByText(/te alcanzan para 30 giros/)).toBeInTheDocument();
+  });
+
+  it("explains why automatic play is unavailable when the balance does not reach the minimum", async () => {
+    renderApp(<Slots />, { api: apiWith({}, 50) }); // 5 giros a 10: menos que la opcion minima
+    await waitFor(() => expect(screen.getByRole("button", { name: /Girar por/ })).toBeEnabled());
+
+    expect(screen.getByRole("button", { name: "10 giros" })).toBeDisabled();
+    expect(screen.getByText(/Juego automático no disponible/)).toBeInTheDocument();
   });
 
   it("shows a loss without celebrating", async () => {
@@ -108,7 +147,7 @@ describe("Slots", () => {
 
     expect(await screen.findByText("No hubo suerte esta vez")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(symbolsShown()).toEqual(["Limon", "Bar", "Siete"]);
+    await waitFor(() => expect(symbolsShown()).toEqual(["Limon", "Bar", "Siete"])); // ReelsView copia el modelo en un requestAnimationFrame
   });
 
   it("tells the player when a spin only gives the stake back", async () => {
@@ -260,6 +299,6 @@ describe("Slots animation", () => {
 
     // Cuando frenan, recien ahi aparece.
     expect(await screen.findByRole("dialog", { name: "¡Ganaste!" }, { timeout: 6_000 })).toBeInTheDocument();
-    expect(symbolsShown()).toEqual(["Siete", "Siete", "Siete"]);
+    await waitFor(() => expect(symbolsShown()).toEqual(["Siete", "Siete", "Siete"])); // ReelsView copia el modelo en un requestAnimationFrame
   }, 12_000);
 });
