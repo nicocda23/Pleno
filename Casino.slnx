@@ -1,0 +1,35 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Casino.Api/Casino.Api.csproj" />
+    <Project Path="src/Casino.AppHost/Casino.AppHost.csproj" />
+    <Project Path="src/Casino.BuildingBlocks/Casino.BuildingBlocks.csproj" />
+    <Project Path="src/Casino.Contracts/Casino.Contracts.csproj" />
+    <Project Path="src/Casino.ServiceDefaults/Casino.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Games/">
+    <Project Path="src/Modules/Games/Casino.Modules.Games.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Promotions/">
+    <Project Path="src/Modules/Promotions/Casino.Modules.Promotions.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Realtime/">
+    <Project Path="src/Modules/Realtime/Casino.Modules.Realtime.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Users/">
+    <Project Path="src/Modules/Users/Casino.Modules.Users.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Wallet/">
+    <Project Path="src/Modules/Wallet/Casino.Modules.Wallet.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Games.Tests/">
+    <Project Path="tests/Games.Tests/Casino.Games.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Integration.Tests/">
+    <Project Path="tests/Integration.Tests/Casino.Integration.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Wallet.Tests/">
+    <Project Path="tests/Wallet.Tests/Casino.Wallet.Tests.csproj" />
+  </Folder>
+</Solution>
