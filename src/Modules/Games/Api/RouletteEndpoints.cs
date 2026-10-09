@@ -105,7 +105,7 @@ internal static class RouletteEndpoints
             var status = ex.Error switch
             {
                 GamesError.RoundNotFound => StatusCodes.Status404NotFound,
-                GamesError.BetKeyReused => StatusCodes.Status409Conflict,
+                GamesError.BetKeyReused or GamesError.SettingsConflict => StatusCodes.Status409Conflict,
                 _ => StatusCodes.Status400BadRequest,
             };
             return Results.Problem(statusCode: status, title: ex.Error.ToString(), detail: ex.Message);
