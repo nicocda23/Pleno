@@ -30,6 +30,9 @@
     <ProjectReference Include="..\..\src\Casino.Api\Casino.Api.csproj" />
     <ProjectReference Include="..\..\src\Casino.WalletService\Casino.WalletService.csproj" />
     <ProjectReference Include="..\..\src\Modules\Games\Casino.Modules.Games.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Games.Roulette\Casino.Modules.Games.Roulette.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Games.Slots\Casino.Modules.Games.Slots.csproj" />
+    <ProjectReference Include="..\..\src\Casino.GamesService\Casino.GamesService.csproj" />
     <ProjectReference Include="..\..\src\Casino.Contracts\Casino.Contracts.csproj" />
   </ItemGroup>
 

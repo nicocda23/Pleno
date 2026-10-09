@@ -87,8 +87,8 @@ public sealed class RouletteFlowTests(PostgresFixture db, RabbitMqFixture rabbit
     private static Task<ITrackedSession> TrackPublishAsync(CasinoCluster app, object message)
     {
         Func<IMessageContext, Task> publish = async context => await context.PublishAsync(message);
-        // Se sigue la actividad de AMBOS servicios (el juego en la API y la Wallet): el mensaje cruza RabbitMQ entre ellos.
-        return app.Api.Services.GetRequiredService<IHost>().TrackActivity()
+        // Se sigue la actividad de AMBOS servicios (los juegos y la Wallet): el mensaje cruza RabbitMQ entre ellos.
+        return app.Games.Services.GetRequiredService<IHost>().TrackActivity()
             .AlsoTrack(app.Wallet.Services.GetRequiredService<IHost>())
             .IncludeExternalTransports()
             .Timeout(TimeSpan.FromSeconds(45))

@@ -1,7 +1,8 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 import { ApiProvider } from "./api/ApiProvider";
 import { RequireAuth } from "./auth/RequireAuth";
+import { GAME_PAGES } from "./games/registry";
 import { Admin } from "./pages/Admin";
 import { AdminCredits } from "./pages/AdminCredits";
 import { AdminSlots } from "./pages/AdminSlots";
@@ -11,10 +12,6 @@ import { History } from "./pages/History";
 import { Lobby } from "./pages/Lobby";
 import { NotFound } from "./pages/NotFound";
 
-// PixiJS pesa bastante: la ruleta se descarga recien cuando el jugador entra a ella.
-const Slots = lazy(() => import("./pages/Slots").then((m) => ({ default: m.Slots })));
-const Roulette = lazy(() => import("./pages/Roulette").then((m) => ({ default: m.Roulette })));
-
 /** Rutas. Los providers de sesion y tema viven en `main.tsx`; los datos del servidor, aca. */
 export function App() {
   return (
@@ -23,8 +20,10 @@ export function App() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route element={<RequireAuth />}>
           <Route index element={<Lobby />} />
-          <Route path="ruleta" element={<Suspense fallback={<p className="muted" role="status">Cargando la ruleta…</p>}><Roulette /></Suspense>} />
-          <Route path="tragamonedas" element={<Suspense fallback={<p className="muted" role="status">Cargando la tragamonedas…</p>}><Slots /></Suspense>} />
+          {/* Un juego = una pagina registrada (games/registry). Agregar o quitar uno no toca estas rutas. */}
+          {GAME_PAGES.map(({ id, route, component: Game }) => (
+            <Route key={id} path={route} element={<Suspense fallback={<p className="muted" role="status">Cargando el juego…</p>}><Game /></Suspense>} />
+          ))}
           <Route path="historial" element={<History />} />
           <Route path="admin" element={<Admin />} />
           <Route path="admin/cargas" element={<AdminCredits />} />

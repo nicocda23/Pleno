@@ -42,7 +42,7 @@ internal static class RouletteEndpoints
     {
         var group = app.MapGroup("/games/roulette").WithTags("Roulette");
         group.RequireAuthorization(policy => policy.RequireRole(Roles.Player));
-        group.AddEndpointFilter(MapDomainErrors);
+        group.AddEndpointFilter(GamesEndpointFilters.MapDomainErrors);
 
         // La apuesta se resuelve de forma asincrona (Wallet reserva -> juego sortea -> Wallet liquida): responde 202
         // y la ronda se consulta por su BetId. El servidor asigna el nonce; el cliente no puede elegirlo.
@@ -93,26 +93,4 @@ internal static class RouletteEndpoints
         round.Id, round.Status, round.BetType.ToString(), round.Selection, round.Stake,
         [.. round.AllBets().Select(b => new BetLineResponse(b.BetType.ToString(), b.Selection, b.Stake))], round.PairId, round.Nonce,
         round.WinningNumber, round.Payout, round.FailureReason, round.PlacedAt);
-
-    internal static async ValueTask<object?> MapDomainErrors(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
-    {
-        try
-        {
-            return await next(context);
-        }
-        catch (GamesDomainException ex)
-        {
-            var status = ex.Error switch
-            {
-                GamesError.RoundNotFound => StatusCodes.Status404NotFound,
-                GamesError.BetKeyReused or GamesError.SettingsConflict => StatusCodes.Status409Conflict,
-                _ => StatusCodes.Status400BadRequest,
-            };
-            return Results.Problem(statusCode: status, title: ex.Error.ToString(), detail: ex.Message);
-        }
-        catch (FairnessDomainException ex)
-        {
-            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: ex.Error.ToString(), detail: ex.Message);
-        }
-    }
 }

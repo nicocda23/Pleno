@@ -4,6 +4,7 @@ using Casino.Integration.Tests.Wallet;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Casino.Hosts.Api;
+using Casino.Hosts.Games;
 using Casino.Hosts.Wallet;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -103,10 +104,17 @@ public static class TestAuth
     {
         ArgumentNullException.ThrowIfNull(db);
 
-        // La Wallet arranca primero (y escucha sus colas) y su "cable" en memoria se le entrega al proxy del gateway.
+        // La Wallet y los juegos arrancan primero (y escuchan sus colas); su "cable" en memoria se le entrega al proxy del gateway.
         var wallet = StartWalletHost(db, rabbit, welcomeChips, customize, testIssuer);
-        var api = StartApiHost(db, rabbit, wallet.Server.CreateHandler(), customize, testIssuer, redis);
-        return new CasinoCluster(api, wallet);
+        var games = StartGamesHost(db, rabbit, customize, testIssuer);
+        var api = StartApiHost(
+            db,
+            rabbit,
+            new Dictionary<string, HttpMessageHandler> { ["wallet"] = wallet.Server.CreateHandler(), ["games"] = games.Server.CreateHandler() },
+            customize,
+            testIssuer,
+            redis);
+        return new CasinoCluster(api, wallet, games);
     }
 
     /// <summary>Solo el servicio de la Wallet (su base walletdb y su conexion a RabbitMQ).</summary>
@@ -142,14 +150,42 @@ public static class TestAuth
         });
     }
 
+    /// <summary>Solo el servicio de juegos (su base gamesdb, la clave maestra de las semillas y su conexion a RabbitMQ).</summary>
+    public static WebApplicationFactory<GamesServiceEntryPoint> StartGamesHost(
+        PostgresFixture db,
+        RabbitMqFixture? rabbit = null,
+        Action<IWebHostBuilder>? customize = null,
+        bool testIssuer = true)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+
+        return new WebApplicationFactory<GamesServiceEntryPoint>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Development");
+            builder.UseSetting("ConnectionStrings:gamesdb", db.GamesDbConnectionString);
+            builder.UseSetting("Fairness:MasterKey", db.MasterKey);
+            if (rabbit is not null)
+            {
+                builder.UseSetting("ConnectionStrings:rabbitmq", rabbit.ConnectionString);
+            }
+
+            if (testIssuer)
+            {
+                Configure(builder);
+            }
+
+            customize?.Invoke(builder);
+        });
+    }
+
     /// <summary>
-    /// Solo el host principal (su base usersdb). Si se da <paramref name="walletHandler"/>, el proxy del gateway le reenvia lo de la Wallet
-    /// por ese cable en memoria; sin el, esas rutas no tienen a quien llegar.
+    /// Solo el host principal (su base usersdb). Con <paramref name="serviceHandlers"/> (por nombre de cluster: "wallet", "games") el proxy del gateway
+    /// reenvia a cada servicio por ese cable en memoria; sin ellos, esas rutas no tienen a quien llegar.
     /// </summary>
     public static WebApplicationFactory<ApiEntryPoint> StartApiHost(
         PostgresFixture db,
         RabbitMqFixture? rabbit = null,
-        HttpMessageHandler? walletHandler = null,
+        IReadOnlyDictionary<string, HttpMessageHandler>? serviceHandlers = null,
         Action<IWebHostBuilder>? customize = null,
         bool testIssuer = true,
         string? redis = null)
@@ -160,11 +196,11 @@ public static class TestAuth
         {
             builder.UseEnvironment("Development");
             builder.UseSetting("ConnectionStrings:usersdb", db.UsersDbConnectionString);
-            builder.UseSetting("Fairness:MasterKey", db.MasterKey);
             builder.UseSetting("ReverseProxy:Clusters:wallet:Destinations:wallet:Address", CasinoCluster.WalletAddress);
-            if (walletHandler is not null)
+            builder.UseSetting("ReverseProxy:Clusters:games:Destinations:games:Address", CasinoCluster.GamesAddress);
+            if (serviceHandlers is not null)
             {
-                builder.ConfigureTestServices(services => services.AddSingleton<IForwarderHttpClientFactory>(new CasinoCluster.InMemoryForwarderHttpClientFactory(walletHandler)));
+                builder.ConfigureTestServices(services => services.AddSingleton<IForwarderHttpClientFactory>(new CasinoCluster.InMemoryForwarderHttpClientFactory(serviceHandlers)));
             }
 
             if (rabbit is not null)

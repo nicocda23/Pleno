@@ -1,24 +1,7 @@
+using Casino.Modules.Games.Application;
 using Marten.Schema;
 
 namespace Casino.Modules.Games.Roulette;
-
-public enum RoundStatus
-{
-    /// <summary>La apuesta se coloco: nonce asignado y orden de reserva encolada.</summary>
-    Placed = 1,
-
-    /// <summary>La Wallet reservo las fichas y el juego ya sorteo. Falta que la Wallet liquide.</summary>
-    Resolved = 2,
-
-    /// <summary>La Wallet liquido el premio. Estado final.</summary>
-    Settled = 3,
-
-    /// <summary>La Wallet rechazo la reserva (por ejemplo, saldo insuficiente). Estado final: nunca se jugo.</summary>
-    Rejected = 4,
-
-    /// <summary>La ronda se anulo y las fichas volvieron al jugador (vencio la reserva o la liquidacion fue rechazada). Estado final.</summary>
-    Voided = 5,
-}
 
 /// <summary>Una apuesta dentro de una tirada (el tipo, lo que se eligio y las fichas puestas ahi).</summary>
 public sealed class RoundBet

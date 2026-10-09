@@ -1,5 +1,4 @@
 using Casino.Hosting;
-using Casino.Modules.Games.Api;
 using Casino.Modules.Realtime.Api;
 using Casino.Modules.Users.Api;
 
@@ -35,7 +34,6 @@ builder.Services.AddReverseProxy()
     .AddServiceDiscoveryDestinationResolver();
 
 builder.Services.AddUsersModule();
-builder.Services.AddGamesModule();
 builder.Services.AddRealtimeModule();
 
 var app = builder.Build();
@@ -57,7 +55,6 @@ app.UsePlayerProvisioning();
 
 // Todos los endpoints de negocio exigen un token valido y el rol correspondiente (ver cada modulo).
 app.MapUsersModule();
-app.MapGamesModule();
 app.MapRealtimeModule();
 app.MapReverseProxy();
 

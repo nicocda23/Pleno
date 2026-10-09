@@ -3,7 +3,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Casino.ServiceDefaults\Casino.ServiceDefaults.csproj" />
     <ProjectReference Include="..\Casino.Hosting\Casino.Hosting.csproj" />
-    <ProjectReference Include="..\Modules\Games\Casino.Modules.Games.csproj" />
     <ProjectReference Include="..\Modules\Realtime\Casino.Modules.Realtime.csproj" />
     <ProjectReference Include="..\Modules\Users\Casino.Modules.Users.csproj" />
     <ProjectReference Include="..\Modules\Promotions\Casino.Modules.Promotions.csproj" />

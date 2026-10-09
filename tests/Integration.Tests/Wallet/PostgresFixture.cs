@@ -1,5 +1,6 @@
 using Casino.Modules.Games.Application;
 using Casino.Modules.Games.Infrastructure;
+using Casino.Hosts.Games;
 using Casino.Modules.Wallet.Application;
 using Casino.Modules.Wallet.Infrastructure;
 using Marten;
@@ -20,6 +21,9 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     /// <summary>La base del host principal (usuarios y juegos).</summary>
     public string UsersDbConnectionString { get; private set; } = string.Empty;
+
+    /// <summary>La base del servicio de juegos.</summary>
+    public string GamesDbConnectionString { get; private set; } = string.Empty;
 
     public IDocumentStore Store { get; private set; } = null!;
 
@@ -44,11 +48,12 @@ public sealed class PostgresFixture : IAsyncLifetime
         Store = DocumentStore.For(options =>
         {
             WalletMartenConfiguration.Configure(options, ConnectionString);
-            GamesMartenConfiguration.Register(options);
+            GamesMartenConfiguration.Register(options, AvailableGames.All());
         });
         await Store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
         WalletDbConnectionString = await CreateDatabaseAsync("walletdb");
         UsersDbConnectionString = await CreateDatabaseAsync("usersdb");
+        GamesDbConnectionString = await CreateDatabaseAsync("gamesdb");
         Wallet = new WalletService(Store, TimeProvider.System);
         Fairness = new FairnessService(Store, Protector, TimeProvider.System);
     }

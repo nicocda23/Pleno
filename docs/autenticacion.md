@@ -12,11 +12,11 @@ Ninguno se versiona. Se guardan con user-secrets:
 | Secreto | Proyecto | Para que |
 | --- | --- | --- |
 | `Parameters:keycloak-admin-password` | `src/Casino.AppHost` | Clave del administrador de Keycloak |
-| `Fairness:MasterKey` | `src/Casino.Api` | Clave maestra que cifra las server seeds (32 bytes en base64) |
+| `Fairness:MasterKey` | `src/Casino.GamesService` | Clave maestra que cifra las server seeds (32 bytes en base64) |
 
 ```
 dotnet user-secrets set "Parameters:keycloak-admin-password" "<valor>" --project src/Casino.AppHost
-dotnet user-secrets set "Fairness:MasterKey" "<32 bytes aleatorios en base64>" --project src/Casino.Api
+dotnet user-secrets set "Fairness:MasterKey" "<32 bytes aleatorios en base64>" --project src/Casino.GamesService
 ```
 
 ## Usuarios de desarrollo del realm `casino`
