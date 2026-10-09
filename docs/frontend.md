@@ -56,5 +56,6 @@ web/e2e/       recorridos con navegador real
 - Lobby con catálogo (Ruleta disponible; el resto "Próximamente") y últimas jugadas.
 - Mesa de ruleta: tapete completo (los 37 números, caballos, calles, cuadros, seisenas, docenas, columnas y chances simples) y rueda animada con PixiJS. Se puede apostar a varios lugares en la misma tirada (con "Deshacer" y "Quitar todo").
 - Tragamonedas de 3 rodillos con tabla de pagos y retorno publicados (`/tragamonedas`); los rodillos frenan en lo que ya decidió el servidor.
+- Panel de administración: carga de fichas (`/admin`), historial de cargas (`/admin/cargas`) y ajustes de la tragamonedas (`/admin/tragamonedas`, con prueba en vivo del retorno antes de publicar).
 - Movimientos (`/movimientos`): extracto de la cuenta con el saldo después de cada cambio, derivado del ledger. El administrador tiene el historial completo de cargas (`/admin/cargas`) con filtros por jugador y fechas y el total del filtro.
 - Historial con verificación: revelar la semilla y abrir la página pública `/verify` ya completa.
