@@ -50,14 +50,15 @@ public sealed class GameContractTests(PostgresFixture db, RabbitMqFixture rabbit
         var catalog = await player.GetFromJsonAsync<JsonElement>("/games");
 
         var cards = catalog.EnumerateArray().ToDictionary(c => c.GetProperty("id").GetString()!);
-        Assert.Equal(["roulette", "slots"], cards.Keys.Order());
+        Assert.Equal(["crash", "roulette", "slots"], cards.Keys.Order());
+        Assert.Equal("/crash", cards["crash"].GetProperty("route").GetString());
         Assert.Equal("/ruleta", cards["roulette"].GetProperty("route").GetString());
         Assert.Equal("/tragamonedas", cards["slots"].GetProperty("route").GetString());
         Assert.All(cards.Values, c =>
         {
             Assert.False(string.IsNullOrWhiteSpace(c.GetProperty("name").GetString()));
             Assert.False(string.IsNullOrWhiteSpace(c.GetProperty("tagline").GetString()));
-            Assert.Equal("Server", c.GetProperty("resolution").GetString()); // los dos juegos actuales sortea el servidor
+            Assert.Equal("Server", c.GetProperty("resolution").GetString()); // en los tres juegos actuales decide el servidor
         });
         using var anonymous = cluster.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/games")).StatusCode);

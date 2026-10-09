@@ -36,12 +36,20 @@ describe("Lobby catalog", () => {
   });
 
   it("shows a game the server has but this front cannot play yet as coming soon, not as a broken link", async () => {
-    const crash: GameInfo = { id: "crash", name: "Crash", tagline: "Un cohete.", route: "/crash", glyph: "▲", resolution: "Server" };
-    renderApp(<Lobby />, { api: apiWith(() => [roulette, crash]) });
+    const dice: GameInfo = { id: "dados", name: "Dados", tagline: "Dos dados.", route: "/dados", glyph: "⚀", resolution: "Server" };
+    renderApp(<Lobby />, { api: apiWith(() => [roulette, dice]) });
 
     await section().findByRole("link", { name: /Ruleta europea/ });
-    expect(section().queryByRole("link", { name: /Crash/ })).not.toBeInTheDocument();
-    expect(section().getAllByText("Crash")).toHaveLength(1); // una sola tarjeta, aunque tambien este en el roadmap
+    expect(section().queryByRole("link", { name: /Dados/ })).not.toBeInTheDocument();
+    expect(section().getAllByText("Dados")).toHaveLength(1);
+  });
+
+  it("lists Crash with a link now that the front has its page", async () => {
+    const crash: GameInfo = { id: "crash", name: "Crash", tagline: "Un cohete.", route: "/crash", glyph: "▲", resolution: "Server" };
+    renderApp(<Lobby />, { api: apiWith(() => [roulette, slots, crash]) });
+
+    expect(await section().findByRole("link", { name: /Crash/ })).toHaveAttribute("href", "/crash");
+    expect(section().getAllByText("Crash")).toHaveLength(1);
   });
 
   it("keeps the roadmap games as coming soon while they do not exist", async () => {
@@ -51,7 +59,7 @@ describe("Lobby catalog", () => {
     expect(section().getByText("Blackjack")).toBeInTheDocument();
     expect(section().getByText("Poker")).toBeInTheDocument();
     expect(section().queryByRole("link", { name: /Blackjack/ })).not.toBeInTheDocument();
-    expect(section().getAllByText("Próximamente").length).toBeGreaterThanOrEqual(3);
+    expect(section().getAllByText("Próximamente").length).toBeGreaterThanOrEqual(2);
   });
 
   it("tells the player when the catalog cannot be loaded", async () => {

@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./ApiProvider";
 import { ApiError } from "./client";
-import type { Account, GameInfo, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
+import type { Account, CrashBet, CrashCashOut, CrashState, GameInfo, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
 
 export const queryKeys = {
   spinsAll: ["spins"] as const,
@@ -18,6 +18,8 @@ export const queryKeys = {
   adminCreditsAll: ["admin", "credits"] as const,
   movements: ["movements"] as const,
   games: ["games"] as const,
+  crashState: ["crash", "state"] as const,
+  crashBets: ["crash", "bets"] as const,
   slotsSettings: ["admin", "slots-settings"] as const,
   slotsSettingsHistory: ["admin", "slots-settings-history"] as const,
   adminAccount: (userId: string) => ["admin", "account", userId] as const,
@@ -234,4 +236,42 @@ export function useSlotsSettingsHistory(enabled: boolean) {
 export function useGames() {
   const api = useApi();
   return useQuery({ queryKey: queryKeys.games, queryFn: () => api.get<GameInfo[]>("/games"), staleTime: 60_000 });
+}
+
+/**
+ * El estado de Crash: la ronda en curso, mi apuesta y las ultimas explosiones. Se consulta cada segundo (respaldo) y los hechos en vivo que
+ * llegan por SignalR lo refrescan al instante. `offsetMs` es cuanto adelanta el reloj del servidor al del navegador, para dibujar el
+ * multiplicador con la hora del servidor.
+ */
+export function useCrashState() {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.crashState,
+    queryFn: async () => {
+      const sentAt = Date.now();
+      const state = await api.get<CrashState>("/games/crash/state");
+      const receivedAt = Date.now();
+      // Se supone que la respuesta tardo lo mismo en ir que en volver: la hora del servidor corresponde a la mitad del viaje.
+      return { ...state, offsetMs: Date.parse(state.serverNow) - (sentAt + receivedAt) / 2 };
+    },
+    refetchInterval: 1_000,
+  });
+}
+
+export function usePlaceCrashBet() {
+  const api = useApi();
+  return useMutation({
+    mutationFn: ({ stake, autoCashOut, idempotencyKey }: { stake: number; autoCashOut: number | null; idempotencyKey: string }) =>
+      api.post<{ betId: string; roundId: string }>("/games/crash/bets", { stake, autoCashOut }, { "Idempotency-Key": idempotencyKey }),
+  });
+}
+
+export function useCrashCashOut() {
+  const api = useApi();
+  return useMutation({ mutationFn: (betId: string) => api.post<CrashCashOut>(`/games/crash/bets/${betId}/cashout`) });
+}
+
+export function useCrashBets(limit = 10) {
+  const api = useApi();
+  return useQuery({ queryKey: [...queryKeys.crashBets, limit], queryFn: () => api.get<CrashBet[]>(`/games/crash/bets?limit=${limit}`) });
 }

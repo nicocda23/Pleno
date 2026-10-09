@@ -143,6 +143,61 @@ export interface GameInfo {
   resolution: GameResolution;
 }
 
+/** Un hecho en vivo que un juego de ronda compartida difunde a todos los jugadores. `data` es propio de cada juego. */
+export interface GameEvent {
+  game: string;
+  kind: string;
+  data: unknown;
+  at: string;
+}
+
+/** Una ronda de Crash. El punto de explosion y la semilla son null hasta que explota. */
+export interface CrashRound {
+  id: string;
+  phase: "Betting" | "Running" | "Crashed" | "Aborted";
+  commitment: string;
+  openedAt: string;
+  bettingEndsAt: string;
+  startedAt: string | null;
+  crashedAt: string | null;
+  /** En centesimas (250 = x2,50). */
+  crashPoint: number | null;
+  serverSeed: string | null;
+  edgePermille: number;
+  growthPerSecond: number;
+}
+
+export interface CrashBet {
+  betId: string;
+  roundId: string;
+  status: RoundStatus;
+  stake: number;
+  autoCashOut: number | null;
+  /** Reservada y todavia sin resultado: se puede retirar. */
+  inPlay: boolean;
+  /** Multiplicador (centesimas) en el que se retiro. */
+  cashedOutAt: number | null;
+  payout: number | null;
+  failureReason: string | null;
+  placedAt: string;
+}
+
+export interface CrashState {
+  serverNow: string;
+  growthPerSecond: number;
+  minStake: number;
+  maxStake: number;
+  round: CrashRound | null;
+  myBet: CrashBet | null;
+  history: CrashRound[];
+}
+
+export interface CrashCashOut {
+  betId: string;
+  multiplier: number;
+  payout: number;
+}
+
 /** Un giro de tragamonedas. */
 export interface Spin {
   betId: string;

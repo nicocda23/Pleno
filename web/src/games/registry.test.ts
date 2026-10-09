@@ -7,6 +7,7 @@ describe("game registry", () => {
   it("has a page for the games that exist today, with unique ids and routes", () => {
     expect(pageFor("roulette")?.route).toBe("ruleta");
     expect(pageFor("slots")?.route).toBe("tragamonedas");
+    expect(pageFor("crash")?.route).toBe("crash");
     expect(pageFor("no-existe")).toBeUndefined();
     expect(new Set(GAME_PAGES.map((p) => p.id)).size).toBe(GAME_PAGES.length);
     expect(new Set(GAME_PAGES.map((p) => p.route)).size).toBe(GAME_PAGES.length);
