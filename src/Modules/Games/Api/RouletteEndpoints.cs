@@ -94,7 +94,7 @@ internal static class RouletteEndpoints
         [.. round.AllBets().Select(b => new BetLineResponse(b.BetType.ToString(), b.Selection, b.Stake))], round.PairId, round.Nonce,
         round.WinningNumber, round.Payout, round.FailureReason, round.PlacedAt);
 
-    private static async ValueTask<object?> MapDomainErrors(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+    internal static async ValueTask<object?> MapDomainErrors(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         try
         {

@@ -1,6 +1,7 @@
 using Casino.BuildingBlocks;
 using Casino.Modules.Games.Application;
 using Casino.Modules.Games.Infrastructure;
+using Casino.Modules.Games.Slots;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +18,9 @@ public static class GamesModule
         services.AddSingleton(sp => SeedProtector.FromBase64Key(sp.GetRequiredService<IConfiguration>()["Fairness:MasterKey"]));
         services.TryAddSingleton<IOutboxFactory, WolverineOutboxFactory>();
         services.AddSingleton<FairnessService>();
+        services.AddSingleton(sp => SlotsOptions.Load(sp.GetRequiredService<IConfiguration>()));
         services.AddSingleton<RouletteService>();
+        services.AddSingleton<SlotsService>();
         return services;
     }
 
@@ -26,6 +29,7 @@ public static class GamesModule
     {
         FairnessEndpoints.Map(app);
         RouletteEndpoints.Map(app);
+        SlotsEndpoints.Map(app);
         return app;
     }
 }

@@ -239,7 +239,7 @@ public sealed partial class RouletteService(
             await fairness.CompleteBetAsync(round.UserId, round.Id, ct);
         }
     }
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Mensaje de una apuesta que no es de ruleta ({BetId}): se ignora.")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Mensaje de una apuesta que no es de ruleta ({BetId}): se ignora (la atiende otro juego).")]
     private static partial void LogForeignBet(ILogger logger, Guid betId);
 
 

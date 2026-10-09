@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import type { WheelModel, WheelPhase } from "./wheel";
+
+/** Lo minimo que necesita el reloj de un modelo de animacion: una fase, un resultado y un `update`. */
+export interface ClockedModel<P extends string> {
+  phase: P;
+  result: unknown;
+  update(deltaMs: number): void;
+}
 
 /**
  * Hace avanzar el modelo de la rueda con requestAnimationFrame y avisa cuando cambia de fase.
  * Vive aparte del dibujo: la bola "cae" aunque PixiJS no pueda dibujar, y el resultado se revela recien cuando se asienta.
  */
-export function useWheelClock(model: WheelModel, onSettled: (result: number) => void): WheelPhase {
-  const [phase, setPhase] = useState<WheelPhase>(model.phase);
+export function useWheelClock<P extends string, R>(model: ClockedModel<P> & { result: R | null }, onSettled: (result: R) => void): P {
+  const [phase, setPhase] = useState<P>(model.phase);
   const settled = useRef(onSettled);
   useEffect(() => {
     settled.current = onSettled;
@@ -25,7 +31,7 @@ export function useWheelClock(model: WheelModel, onSettled: (result: number) => 
         const before = current;
         current = model.phase;
         setPhase(current);
-        if (before !== "settled" && current === "settled" && model.result !== null) settled.current(model.result);
+        if (before !== "settled" && current === "settled" && model.result !== null) settled.current(model.result as R);
       }
       frame = requestAnimationFrame(tick);
     };
