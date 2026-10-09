@@ -84,12 +84,14 @@ export function RealtimeProvider({ children, connectionFactory = defaultConnecti
     const refresh = () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.account });
       void queryClient.invalidateQueries({ queryKey: queryKeys.roundsAll });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.spinsAll });
     };
 
     hub.on("balanceChanged", ((notice: BalanceNotice) => dispatch({ type: "notice", notice })) as (payload: never) => void);
     hub.on("roundClosed", ((notice: RoundClosedNotice) => {
       listeners.current.forEach((listener) => listener(notice));
       void queryClient.invalidateQueries({ queryKey: queryKeys.roundsAll });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.spinsAll });
     }) as (payload: never) => void);
     hub.onreconnecting(() => !disposed && setConnection("reconnecting"));
     hub.onreconnected(() => {
