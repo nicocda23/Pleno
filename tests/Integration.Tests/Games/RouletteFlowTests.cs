@@ -280,8 +280,8 @@ public sealed class RouletteFlowTests(PostgresFixture db, RabbitMqFixture rabbit
             [
                 new { betType = "Red", selection = Array.Empty<int>(), stake = 100L },
                 new { betType = "Black", selection = Array.Empty<int>(), stake = 50L },
-                new { betType = "Straight", selection = new[] { 7 }, stake = 10L },
-                new { betType = "Column", selection = new[] { 1 }, stake = 40L },
+                new { betType = "Straight", selection = new List<int> { 7 }, stake = 10L },
+                new { betType = "Column", selection = new List<int> { 1 }, stake = 40L },
             ],
             "spin-1"));
         var betId = placed.GetProperty("betId").GetGuid();
@@ -347,7 +347,7 @@ public sealed class RouletteFlowTests(PostgresFixture db, RabbitMqFixture rabbit
 
         var response = await PlaceSpinAsync(
             client,
-            [new { betType = "Red", selection = Array.Empty<int>(), stake = 10L }, new { betType = "Straight", selection = new[] { 99 }, stake = 10L }],
+            [new { betType = "Red", selection = Array.Empty<int>(), stake = 10L }, new { betType = "Straight", selection = new List<int> { 99 }, stake = 10L }],
             "spin-bad");
         var empty = await PlaceSpinAsync(client, [], "spin-empty");
 

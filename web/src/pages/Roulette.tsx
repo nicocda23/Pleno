@@ -146,6 +146,15 @@ export function Roulette() {
     setDrops((current) => [...current, { spot, amount: chip }]);
   };
 
+  /** Saca la ultima ficha que se puso en ese lugar (un clic derecho en el tapete o el boton de la lista). */
+  const unpick = (spot: Spot) => {
+    setError(null);
+    setDrops((current) => {
+      const i = current.map((d) => d.spot.id).lastIndexOf(spot.id);
+      return i < 0 ? current : current.filter((_, j) => j !== i);
+    });
+  };
+
   const submit = async () => {
     if (placed.length === 0) return;
     setError(null);
@@ -199,7 +208,7 @@ export function Roulette() {
             ))}
           </div>
 
-          <Board placed={placed} disabled={spinning} winning={result?.status === "Settled" ? result.winningNumber : null} onPick={pick} />
+          <Board placed={placed} disabled={spinning} winning={result?.status === "Settled" ? result.winningNumber : null} onPick={pick} onRemove={unpick} />
 
           <div className="summary">
             {placed.length > 0 ? (
@@ -211,11 +220,14 @@ export function Roulette() {
                       <span className="muted">
                         {formatChips(p.stake)} fichas · si sale, cobrás {formatChips(p.stake * p.spot.multiplier)}
                       </span>
+                      <button type="button" className="link-btn" disabled={spinning} aria-label={`Quitar una ficha de ${p.spot.label}`} onClick={() => unpick(p.spot)}>
+                        − ficha
+                      </button>
                     </li>
                   ))}
                 </ul>
                 <span>
-                  Total apostado: <strong>{formatChips(stake)}</strong> fichas. Podés apostar a varios lugares a la vez; tocá otra vez el mismo lugar para sumar fichas.
+                  Total apostado: <strong>{formatChips(stake)}</strong> fichas. Podés apostar a varios lugares a la vez; tocá otra vez el mismo lugar para sumar fichas y clic derecho (o “− ficha”) para sacar una.
                 </span>
               </>
             ) : (
