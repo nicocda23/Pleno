@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { usePaytable, usePlaceSpin, useSpin, useSpins } from "../api/hooks";
 import type { Paytable, Spin } from "../api/types";
+import { Confetti } from "../components/Confetti";
 import { useToasts } from "../components/Toasts";
 import { formatChips } from "../lib/format";
 import { errorMessage, failureMessage } from "../lib/messages";
 import { ReelsModel } from "../lib/reels";
 import { glyphOf, labelOf } from "../lib/slots";
 import { useWheelClock } from "../lib/useWheelClock";
+import { playWinSound } from "../lib/winSound";
 import { useRealtime } from "../realtime/RealtimeProvider";
 
 const CHIPS = [10, 50, 100, 500];
+const AUTO_COUNTS = [10, 25, 50, 100];
+const AUTO_PAUSE_MS = 700;
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -27,16 +31,26 @@ function Machine({ paytable }: { paytable: Paytable }) {
   const { balance, onRoundClosed, holdBalance } = useRealtime();
   const toasts = useToasts();
   const placeSpin = usePlaceSpin();
-  const recent = useSpins(8);
+  const recent = useSpins(30);
   const names = paytable.symbols.map((s) => s.name);
 
   const [model] = useState(() => new ReelsModel(names.length, paytable.reels, { reduceMotion: prefersReducedMotion() }));
-  const [stake, setStake] = useState(Math.min(10, paytable.maxStake));
+  const defaultStake = Math.min(10, paytable.maxStake);
+  const [stake, setStake] = useState(defaultStake);
+  // Texto del campo "Otro": vacio mientras se usa una ficha rapida; con contenido cuando el monto es personalizado.
+  const [custom, setCustom] = useState("");
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<Spin | null>(null);
   const [winPopup, setWinPopup] = useState<Spin | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Giros automaticos que faltan (0 = apagado). El ref lo lee reveal(), que puede correr desde un callback viejo.
+  const [auto, setAutoState] = useState(0);
+  const autoRef = useRef(0);
+  const setAuto = (n: number) => {
+    autoRef.current = n;
+    setAutoState(n);
+  };
 
   // Misma apuesta = misma clave de idempotencia: si la respuesta se pierde y el jugador reintenta, el servidor no cobra dos veces.
   const pending = useRef<{ stake: number; key: string } | null>(null);
@@ -55,6 +69,8 @@ function Machine({ paytable }: { paytable: Paytable }) {
   const stakeValid = Number.isInteger(stake) && stake >= paytable.minStake && stake <= paytable.maxStake;
   const canSpin = stakeValid && stake <= balance.available && !spinning && !placeSpin.isPending;
 
+  const affordable = stakeValid ? Math.floor(balance.available / stake) : 0;
+
   const reveal = (spin: Spin) => {
     setResult(spin);
     setSpinning(false);
@@ -62,12 +78,22 @@ function Machine({ paytable }: { paytable: Paytable }) {
     release(); // recien ahora el saldo se actualiza
     if (spin.status === "Settled") {
       const payout = spin.payout ?? 0;
-      if (payout > spin.stake) setWinPopup(spin);
-      else if (payout === spin.stake) toasts.show("info", "Recuperaste tus fichas.");
+      if (payout > spin.stake && autoRef.current > 0) {
+        // En automatico no se interrumpe con el popup: un aviso y sigue.
+        toasts.show("info", `Ganaste ${formatChips(payout - spin.stake)} fichas.`);
+        playWinSound();
+      } else if (payout > spin.stake) {
+        setWinPopup(spin);
+        playWinSound();
+      } else if (autoRef.current > 0) {
+        // En automatico solo se avisa cuando se gana.
+      } else if (payout === spin.stake) toasts.show("info", "Recuperaste tus fichas.");
       else toasts.show("loss", "Sin premio esta vez.");
     } else if (spin.status === "Rejected") {
+      setAuto(0);
       toasts.show("error", failureMessage(spin.failureReason));
     } else {
+      setAuto(0);
       toasts.show("info", "El giro se anuló y tus fichas volvieron a tu saldo.");
     }
   };
@@ -148,12 +174,33 @@ function Machine({ paytable }: { paytable: Paytable }) {
     } catch (e) {
       model.cancel();
       setSpinning(false);
+      setAuto(0);
       release();
       setError(errorMessage(e));
       // Error definitivo (la API lo rechazo): proximo giro con clave nueva. Si fue de red, se conserva para reintentar sin duplicar.
       if (e instanceof Error && "status" in e && (e as { status: number }).status !== 0) pending.current = null;
     }
   };
+
+  const submitRef = useRef(submit);
+  useEffect(() => {
+    submitRef.current = submit;
+  });
+
+  // Juego automatico: cuando los rodillos frenan y quedan giros, tras una pausa corta se lanza el siguiente.
+  useEffect(() => {
+    if (auto <= 0 || spinning || placeSpin.isPending) return;
+    const timer = setTimeout(() => {
+      if (!canSpin) {
+        setAuto(0);
+        if (stakeValid && stake > balance.available) toasts.show("info", "Se detuvo el juego automático: no te alcanzan las fichas.");
+        return;
+      }
+      setAuto(autoRef.current - 1);
+      void submitRef.current();
+    }, result ? AUTO_PAUSE_MS : 0);
+    return () => clearTimeout(timer);
+  }, [auto, spinning, placeSpin.isPending, canSpin, result, stakeValid, stake, balance.available, toasts]);
 
   const label = phase === "settled" && result ? `Salió ${result.reels.map(labelOf).join(", ")}` : phase === "idle" ? "Rodillos quietos" : "Los rodillos están girando";
 
@@ -171,17 +218,26 @@ function Machine({ paytable }: { paytable: Paytable }) {
           <ReelsView model={model} names={names} phase={phase} label={label} />
 
           <h3 className="section-subtitle">Cuántas fichas</h3>
-          <div className="chips" role="radiogroup" aria-label="Fichas a apostar">
+          <div className="chips chips--stake" role="radiogroup" aria-label="Fichas a apostar">
             {CHIPS.filter((value) => value <= paytable.maxStake).map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={stake === value} disabled={spinning} className={`choice choice--stake ${stake === value ? "choice--on" : ""}`} onClick={() => setStake(value)}>
+              <button key={value} type="button" role="radio" aria-checked={stake === value} disabled={spinning || auto > 0} className={`choice choice--stake ${stake === value ? "choice--on" : ""}`} onClick={() => {
+                setStake(value);
+                setCustom("");
+              }}>
                 {formatChips(value)}
               </button>
             ))}
+            <input
+              className={`chip-input ${custom === "" ? "" : "chip-input--on"}`}
+              type="number" inputMode="numeric" min={paytable.minStake} max={paytable.maxStake} step={1}
+              placeholder="✎" aria-label={`Otro monto (${formatChips(paytable.minStake)} a ${formatChips(paytable.maxStake)})`}
+              value={custom} disabled={spinning || auto > 0} aria-invalid={custom !== "" && !stakeValid}
+              onChange={(e) => {
+                setCustom(e.target.value);
+                setStake(e.target.value === "" ? defaultStake : Math.trunc(Number(e.target.value)));
+              }}
+            />
           </div>
-          <label className="field">
-            <span>Otro monto ({formatChips(paytable.minStake)} a {formatChips(paytable.maxStake)})</span>
-            <input type="number" inputMode="numeric" min={paytable.minStake} max={paytable.maxStake} step={1} value={stake} disabled={spinning} aria-invalid={!stakeValid} onChange={(e) => setStake(Math.trunc(Number(e.target.value)))} />
-          </label>
 
           {stake > balance.available && balance.ready && stakeValid && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa apuesta.</p>}
           {error && <p className="notice notice--error" role="alert">{error}</p>}
@@ -189,6 +245,28 @@ function Machine({ paytable }: { paytable: Paytable }) {
           <button type="button" className="btn btn--gold btn--lg btn--block" disabled={!canSpin} onClick={() => void submit()}>
             {spinning ? "Girando…" : placeSpin.isPending ? "Enviando…" : `Girar por ${formatChips(stake)} fichas`}
           </button>
+
+          <h3 className="section-subtitle">Juego automático</h3>
+          {auto > 0 ? (
+            <button type="button" className="btn btn--ghost btn--block" onClick={() => setAuto(0)}>
+              Detener (quedan {auto})
+            </button>
+          ) : (
+            <div className="chips" role="group" aria-label="Giros automáticos">
+              {AUTO_COUNTS.map((count) => (
+                <button key={count} type="button" className="choice" disabled={!canSpin || count * stake > balance.available} onClick={() => setAuto(count)}>
+                  {count} giros
+                </button>
+              ))}
+            </div>
+          )}
+          {auto === 0 && stakeValid && balance.ready && affordable < Math.max(...AUTO_COUNTS) && (
+            <p className={`notice ${affordable < Math.min(...AUTO_COUNTS) ? "notice--error" : ""}`} role="status">
+              {affordable < Math.min(...AUTO_COUNTS)
+                ? `Juego automático no disponible: con ${formatChips(stake)} fichas por giro te alcanzan para ${affordable} ${affordable === 1 ? "giro" : "giros"} y el juego automático arranca desde ${Math.min(...AUTO_COUNTS)} giros. Bajá la apuesta o cargá fichas.`
+                : `Con ${formatChips(stake)} fichas por giro te alcanzan para ${affordable} giros: las opciones más largas están deshabilitadas.`}
+            </p>
+          )}
 
           <div aria-live="polite">{!spinning && result && <SpinResult spin={result} />}</div>
         </section>
@@ -216,7 +294,7 @@ function Machine({ paytable }: { paytable: Paytable }) {
 
           <h3 className="section-subtitle">Últimos giros</h3>
           <ul className="spin-list" aria-label="Últimos giros">
-            {recent.data?.filter((s) => s.status === "Settled").slice(0, 8).map((s) => (
+            {recent.data?.filter((s) => s.status === "Settled").slice(0, 30).map((s) => (
               <li key={s.betId}>
                 <span aria-hidden="true">{s.reels.map(glyphOf).join(" ")}</span>
                 <span className="sr-only">{s.reels.map(labelOf).join(", ")}</span>
@@ -230,6 +308,7 @@ function Machine({ paytable }: { paytable: Paytable }) {
 
       {winPopup && (
         <div className="win-modal" role="dialog" aria-modal="true" aria-labelledby="win-title" onClick={() => setWinPopup(null)}>
+          <Confetti />
           <div className="win-modal__box" onClick={(e) => e.stopPropagation()}>
             <div className="reels reels--static" aria-hidden="true">
               {winPopup.reels.map((name, i) => (
@@ -269,7 +348,16 @@ function ReelsView({ model, names, phase, label }: { model: ReelsModel; names: s
     <div className="reels" role="img" aria-label={label} data-testid="reels" data-state={phase}>
       {shown.map((symbol, i) => (
         <span key={i} className={`reel ${stopped[i] ? "" : "reel--spinning"}`} data-testid={`reel-${i}`} data-symbol={names[symbol]}>
-          {glyphOf(names[symbol] ?? "")}
+          {stopped[i] ? (
+            <span className="reel__cell reel__cell--landed">{glyphOf(names[symbol] ?? "")}</span>
+          ) : (
+            // Cinta vertical con los simbolos repetidos: al desplazarla la mitad se ve continua. Cada rodillo, a su velocidad.
+            <span className="reel__strip" aria-hidden="true" style={{ animationDuration: `${(names.length * (0.07 + (i % 2) * 0.035)).toFixed(3)}s`, animationDelay: `${-i * 0.11}s` }}>
+              {[...names, ...names].map((name, k) => (
+                <span key={k} className="reel__cell">{glyphOf(name)}</span>
+              ))}
+            </span>
+          )}
         </span>
       ))}
     </div>
