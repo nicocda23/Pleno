@@ -3,7 +3,10 @@ var builder = DistributedApplication.CreateBuilder(args);
 var postgres = builder.AddPostgres("postgres")
     .WithDataVolume()
     .WithPgAdmin();
-var casinoDb = postgres.AddDatabase("casinodb");
+// Una base de datos POR SERVICIO: ningun servicio lee las tablas de otro. Todas viven en el mismo servidor de Postgres (en la nube
+// serian servidores o instancias separadas, sin cambiar el codigo).
+var walletDb = postgres.AddDatabase("walletdb");
+var usersDb = postgres.AddDatabase("usersdb");
 
 var redis = builder.AddRedis("redis")
     .WithDataVolume();
@@ -31,8 +34,15 @@ builder.AddContainer("keycloak", "quay.io/keycloak/keycloak", "26.7.0")
 // Origen del front. Keycloak solo acepta redirecciones a esta URL (ver realms/casino-realm.json), asi que el puerto es fijo.
 const string WebOrigin = "http://localhost:5173";
 
+// Servicio de la Wallet: dueño de las fichas. No se expone al navegador: se llega a el por el gateway (la API) o por mensajes.
+var wallet = builder.AddProject<Projects.Casino_WalletService>("wallet")
+    .WithReference(walletDb).WaitFor(walletDb)
+    .WithReference(rabbit).WaitFor(rabbit)
+    .WithEnvironment("Authentication__Authority", keycloakAuthority);
+
 builder.AddProject<Projects.Casino_Api>("api")
-    .WithReference(casinoDb).WaitFor(casinoDb)
+    .WithReference(usersDb).WaitFor(usersDb)
+    .WithReference(wallet).WaitFor(wallet) // el gateway reenvia /wallet y /backoffice/wallet a este servicio
     .WithReference(redis).WaitFor(redis)
     .WithReference(rabbit).WaitFor(rabbit)
     .WithEnvironment("Authentication__Authority", keycloakAuthority)

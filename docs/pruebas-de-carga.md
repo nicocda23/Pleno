@@ -63,5 +63,30 @@ Lectura: con 20 jugadores el sistema responde con holgura (cobro de ~0,2 a 0,4 s
 ~1,7 s de mediana y se cierran menos apuestas que con 20, lo que indica que el cuello esta en el trayecto por las colas (la propia
 aceptacion de la apuesta sigue rapida). Ningun escenario perdio ni duplico fichas ni dejo rondas sin cerrar.
 
-Estos numeros son la referencia para la fase 4: despues de separar la Wallet y los juegos se vuelven a medir los mismos escenarios y se
-comparan en `docs/adr/` (ADR de la separacion).
+## Despues de separar la Wallet (ADR 0007)
+Misma prueba, mismos escenarios, contra el sistema con la Wallet como servicio aparte (commit `214c873`: `Casino.WalletService` con su
+base, gateway YARP en `Casino.Api`). Tambien se **volvio a medir el monolito** (`dev` actual) el mismo dia, porque entre momentos distintos
+la maquina rinde muy distinto. Tiempos en milisegundos (med / p95 / p99); "cerradas" = apuestas cobradas en la corrida de 60 s.
+
+| Escenario | Monolito (1ra medicion) | Monolito (remedido) | Wallet separada |
+| --- | --- | --- | --- |
+| 20 jugadores, cobro de punta a punta | 177 / 428 / 3.375 y 362 / 791 / 973 | 1.456 / 3.479 / 4.923 | 359 / 727 / 987 |
+| 20 jugadores, apuestas cerradas | 1.777 y 1.526 | 598 | 1.447 |
+| 50 jugadores, cobro de punta a punta | 1.723 / 2.503 / 6.375 | 2.691 / 5.692 / 7.847 y 3.351 / 6.354 / 8.525 | 3.259 / 8.063 / 9.501, 3.425 / 6.154 / 6.394 y 3.542 / 5.390 / 5.648 |
+| 50 jugadores, apuestas cerradas | 1.537 | 1.005 y 855 | 852, 862 y 851 |
+| Aceptar apuesta, 50 jugadores (mediana) | 84 | 135 y 154 | 133, 138 y 146 |
+| Saldos | cierran | cierran | cierran |
+
+**Lectura (honesta):**
+- **No se nota diferencia entre el monolito y la Wallet separada.** A 50 jugadores, ambos se mueven en el mismo rango (mediana de cobro de
+  1,7 a 3,5 s y de 850 a 1.000 apuestas cerradas por minuto). Separar no mejoro ni empeoro de forma medible el rendimiento en esta maquina.
+- **El ruido es mayor que cualquier diferencia entre arquitecturas.** El mismo monolito con 20 jugadores dio una mediana de cobro de 177 ms
+  en un momento y de 1.456 ms en otro (8 veces). Cualquier diferencia menor que eso no se puede atribuir a la arquitectura. Para decidir
+  algo fino hay que medir con la maquina quieta y repetir muchas veces (o medir en un ambiente dedicado).
+- **El techo es el mismo con las dos arquitecturas (~850 a 1.000 apuestas por minuto)**: el cuello de botella no es el salto entre
+  servicios sino algo que ambos comparten (Postgres, RabbitMQ, el procesamiento de mensajes o la CPU de la maquina, donde ademas corre k6).
+  Es el siguiente misterio a investigar: las **trazas de OpenTelemetry de punta a punta** (siguiente item de la fase 4) muestran en que paso
+  se va el tiempo.
+- **Arranque en frio:** con bases recien creadas, la primera apuesta puede tardar mas de 30 s (compilacion JIT, generacion de codigo de
+  Wolverine, creacion de tablas). Conviene "calentar" con una corrida corta antes de medir (las pruebas de extremo a extremo con navegador
+  tambien pueden fallar la primera vez en un stack nuevo y pasar la segunda).

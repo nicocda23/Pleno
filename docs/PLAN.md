@@ -122,11 +122,11 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 
 ### Fase 4 — Distribuir y endurecer (2 semanas)
 
-- [ ] Extraer Wallet y Game Engine como servicios independientes
+- [ ] Extraer Wallet y Game Engine como servicios independientes (Wallet hecha, con su base, gateway YARP y pruebas distribuidas: ver ADR 0007; falta el Game Engine)
 - [ ] Resiliencia con Polly: reintentos, circuit breaker, timeouts
 - [ ] Dead-letter queues con alertas
 - [ ] Trazas de OpenTelemetry de punta a punta a través de la cola
-- [ ] Pruebas de carga con k6 y métricas de latencia p95/p99
+- [x] Pruebas de carga con k6 y métricas de latencia p95/p99 (`tests/load`, línea base y comparación en `docs/pruebas-de-carga.md`)
 - [ ] Chaos: tirar Game Engine a mitad de apuesta y verificar que el saldo cierra
 - [ ] Cambiar RabbitMQ por Azure Service Bus sin tocar el dominio
 

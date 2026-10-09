@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Casino.Api\Casino.Api.csproj" />
+    <ProjectReference Include="..\Casino.WalletService\Casino.WalletService.csproj" />
   </ItemGroup>
 
 </Project>

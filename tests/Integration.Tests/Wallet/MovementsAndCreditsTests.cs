@@ -15,7 +15,7 @@ namespace Casino.Integration.Tests.Wallet;
 [Collection(WalletDbDefinition.Name)]
 public sealed class MovementsAndCreditsTests : IDisposable
 {
-    private readonly WebApplicationFactory<Program> _app;
+    private readonly CasinoCluster _app;
 
     public MovementsAndCreditsTests(PostgresFixture db)
     {

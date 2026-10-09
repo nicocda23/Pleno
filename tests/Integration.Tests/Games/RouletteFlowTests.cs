@@ -24,7 +24,7 @@ namespace Casino.Integration.Tests.Games;
 [Collection(WalletDbDefinition.Name)]
 public sealed class RouletteFlowTests(PostgresFixture db, RabbitMqFixture rabbit, ITestOutputHelper output) : IDisposable
 {
-    private readonly List<WebApplicationFactory<Program>> _apps = [];
+    private readonly List<CasinoCluster> _apps = [];
 
     public void Dispose()
     {
@@ -35,7 +35,7 @@ public sealed class RouletteFlowTests(PostgresFixture db, RabbitMqFixture rabbit
     }
 
     /// <param name="gamesDown">Simula que el motor de juegos no esta consumiendo: nadie sortea ni responde.</param>
-    private WebApplicationFactory<Program> StartApp(int ttlSeconds = 60, bool gamesDown = false)
+    private CasinoCluster StartApp(int ttlSeconds = 60, bool gamesDown = false)
     {
         var app = TestAuth.StartApp(db, rabbit, customize: builder =>
         {
@@ -52,7 +52,7 @@ public sealed class RouletteFlowTests(PostgresFixture db, RabbitMqFixture rabbit
     }
 
     /// <summary>Un jugador con la cuenta ya abierta y fondeada (sin fichas de bienvenida, para que los saldos sean exactos).</summary>
-    private static async Task<(Guid UserId, Guid AccountId)> FundedPlayerAsync(WebApplicationFactory<Program> app, long chips)
+    private static async Task<(Guid UserId, Guid AccountId)> FundedPlayerAsync(CasinoCluster app, long chips)
     {
         var userId = Guid.NewGuid();
         var wallet = app.Services.GetRequiredService<WalletService>();
@@ -84,10 +84,12 @@ public sealed class RouletteFlowTests(PostgresFixture db, RabbitMqFixture rabbit
         return await response.Content.ReadFromJsonAsync<JsonElement>();
     }
 
-    private static Task<ITrackedSession> TrackPublishAsync(WebApplicationFactory<Program> app, object message)
+    private static Task<ITrackedSession> TrackPublishAsync(CasinoCluster app, object message)
     {
         Func<IMessageContext, Task> publish = async context => await context.PublishAsync(message);
-        return app.Services.GetRequiredService<IHost>().TrackActivity()
+        // Se sigue la actividad de AMBOS servicios (el juego en la API y la Wallet): el mensaje cruza RabbitMQ entre ellos.
+        return app.Api.Services.GetRequiredService<IHost>().TrackActivity()
+            .AlsoTrack(app.Wallet.Services.GetRequiredService<IHost>())
             .IncludeExternalTransports()
             .Timeout(TimeSpan.FromSeconds(45))
             .ExecuteAndWaitAsync(publish);

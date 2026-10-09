@@ -1,19 +1,30 @@
 using System.Security.Claims;
-using Casino.BuildingBlocks;
-using Casino.Modules.Realtime.Api;
 using System.Text.Json;
+using Casino.BuildingBlocks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+namespace Casino.Hosting;
 
 /// <summary>
-/// Autenticacion con tokens JWT emitidos por Keycloak (OpenID Connect). La API NUNCA ve contraseñas: solo valida la firma,
-/// el emisor, el destinatario (audience) y la vigencia del token.
+/// Autenticacion con tokens JWT emitidos por Keycloak (OpenID Connect). Ningun servicio ve contraseñas: cada uno valida por su cuenta la
+/// firma, el emisor, el destinatario (audience) y la vigencia del token (no confia en que otro ya lo haya hecho).
 /// </summary>
-internal static class CasinoAuthentication
+public static class CasinoAuthentication
 {
     public const string Audience = "casino-api";
 
-    public static WebApplicationBuilder AddCasinoAuthentication(this WebApplicationBuilder builder)
+    /// <param name="queryTokenPaths">
+    /// Rutas que aceptan el token en la query (<c>?access_token=</c>). Un navegador no puede poner cabeceras en un WebSocket,
+    /// asi que solo el hub de tiempo real lo necesita; el resto de los servicios no pasa nada aca.
+    /// </param>
+    public static WebApplicationBuilder AddCasinoAuthentication(this WebApplicationBuilder builder, params string[] queryTokenPaths)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         var authority = builder.Configuration["Authentication:Authority"];
         if (string.IsNullOrWhiteSpace(authority))
         {
@@ -33,10 +44,9 @@ internal static class CasinoAuthentication
                 options.TokenValidationParameters.RoleClaimType = ClaimTypes.Role;
                 options.Events = new JwtBearerEvents
                 {
-                    // Un navegador no puede poner cabeceras en un WebSocket: el token viaja en la query, pero SOLO para el hub.
                     OnMessageReceived = context =>
                     {
-                        if (context.Request.Path.StartsWithSegments(PlayerHub.Path, StringComparison.OrdinalIgnoreCase)
+                        if (queryTokenPaths.Any(path => context.Request.Path.StartsWithSegments(path, StringComparison.OrdinalIgnoreCase))
                             && context.Request.Query["access_token"] is { Count: > 0 } token)
                         {
                             context.Token = token;

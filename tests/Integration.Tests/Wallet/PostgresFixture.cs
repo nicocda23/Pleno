@@ -15,6 +15,12 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public string ConnectionString { get; private set; } = string.Empty;
 
+    /// <summary>La base del servicio de la Wallet (cada servicio tiene la suya: ninguno lee las tablas de otro).</summary>
+    public string WalletDbConnectionString { get; private set; } = string.Empty;
+
+    /// <summary>La base del host principal (usuarios y juegos).</summary>
+    public string UsersDbConnectionString { get; private set; } = string.Empty;
+
     public IDocumentStore Store { get; private set; } = null!;
 
     public WalletService Wallet { get; private set; } = null!;
@@ -41,8 +47,22 @@ public sealed class PostgresFixture : IAsyncLifetime
             GamesMartenConfiguration.Register(options);
         });
         await Store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
+        WalletDbConnectionString = await CreateDatabaseAsync("walletdb");
+        UsersDbConnectionString = await CreateDatabaseAsync("usersdb");
         Wallet = new WalletService(Store, TimeProvider.System);
         Fairness = new FairnessService(Store, Protector, TimeProvider.System);
+    }
+
+    private async Task<string> CreateDatabaseAsync(string name)
+    {
+        await using (var conn = new NpgsqlConnection(ConnectionString))
+        {
+            await conn.OpenAsync();
+            await using var cmd = new NpgsqlCommand($"CREATE DATABASE {name}", conn);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        return new NpgsqlConnectionStringBuilder(ConnectionString) { Database = name }.ConnectionString;
     }
 
     public async Task DisposeAsync()
@@ -60,7 +80,11 @@ public sealed class PostgresFixture : IAsyncLifetime
         await using var cmd = new NpgsqlCommand(
             "SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()",
             conn);
-        return (long)(await cmd.ExecuteScalarAsync() ?? 0L);
+        var killed = (long)(await cmd.ExecuteScalarAsync() ?? 0L);
+
+        // Las conexiones muertas que quedaron en el pool romperian la primera consulta de la siguiente prueba: se descartan.
+        NpgsqlConnection.ClearAllPools();
+        return killed;
     }
 }
 

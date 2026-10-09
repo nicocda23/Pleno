@@ -17,7 +17,7 @@ namespace Casino.Integration.Tests.Games;
 /// </summary>
 public sealed class SlotsSettingsTests(PostgresFixture db, RabbitMqFixture rabbit) : IClassFixture<PostgresFixture>, IClassFixture<RabbitMqFixture>, IDisposable
 {
-    private readonly List<WebApplicationFactory<Program>> _apps = [];
+    private readonly List<CasinoCluster> _apps = [];
 
     public void Dispose()
     {
@@ -27,7 +27,7 @@ public sealed class SlotsSettingsTests(PostgresFixture db, RabbitMqFixture rabbi
         }
     }
 
-    private WebApplicationFactory<Program> StartApp()
+    private CasinoCluster StartApp()
     {
         var app = TestAuth.StartApp(db, rabbit);
         _apps.Add(app);

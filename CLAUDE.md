@@ -22,6 +22,7 @@ Laboratorio de arquitectura distribuida en .NET. Ver `README.md` y `docs/PLAN.md
 - PII (email, nombre, documento) enmascarada en logs y fuera de trazas/metricas. Datos de prueba solo con Bogus.
 - Tests obligatorios para todo lo que toque la Wallet (unitarios + integracion con Testcontainers).
 - Cada fase cierra con un ADR en `docs/adr/`.
+- Si hago una pregunta con opciones y el usuario no contesta en 2 minutos, elegir siempre la opcion marcada como Recomendada y seguir (y avisar despues cual se eligio).
 
 ## Estructura
-`src/Casino.AppHost` (con `realms/` de Keycloak), `src/Casino.Contracts`, `src/Casino.BuildingBlocks`, `src/Casino.ServiceDefaults`, `src/Casino.Api`, `src/Modules/{Wallet,Games,Realtime,Users,Promotions}`, `tests/`, `web/`, `docs/`.
+`src/Casino.AppHost` (con `realms/` de Keycloak), `src/Casino.Contracts`, `src/Casino.BuildingBlocks`, `src/Casino.Hosting` (autenticacion, JSON, datos y mensajeria comunes a los servicios), `src/Casino.ServiceDefaults`, `src/Casino.Api` (gateway: usuarios, juegos y tiempo real; reenvia lo demas con YARP), `src/Casino.WalletService` (servicio de la Wallet, con su propia base `walletdb`), `src/Modules/{Wallet,Games,Realtime,Users,Promotions}`, `tests/`, `web/`, `docs/`. Cada servicio tiene su base de datos; entre servicios solo hay mensajes (`Casino.Contracts`) y HTTP por el gateway.
