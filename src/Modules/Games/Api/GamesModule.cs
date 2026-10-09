@@ -18,7 +18,10 @@ public static class GamesModule
         services.AddSingleton(sp => SeedProtector.FromBase64Key(sp.GetRequiredService<IConfiguration>()["Fairness:MasterKey"]));
         services.TryAddSingleton<IOutboxFactory, WolverineOutboxFactory>();
         services.AddSingleton<FairnessService>();
-        services.AddSingleton(sp => SlotsOptions.Load(sp.GetRequiredService<IConfiguration>()));
+        services.AddSingleton(sp => new SlotsSettingsStore(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            SlotsOptions.Load(sp.GetRequiredService<IConfiguration>()),
+            sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<RouletteService>();
         services.AddSingleton<SlotsService>();
         return services;
@@ -30,6 +33,7 @@ public static class GamesModule
         FairnessEndpoints.Map(app);
         RouletteEndpoints.Map(app);
         SlotsEndpoints.Map(app);
+        SlotsAdminEndpoints.Map(app);
         return app;
     }
 }

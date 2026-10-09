@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./ApiProvider";
 import { ApiError } from "./client";
-import type { Account, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
+import type { Account, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
 
 export const queryKeys = {
   spinsAll: ["spins"] as const,
@@ -17,6 +17,8 @@ export const queryKeys = {
   adminCredits: (filter: CreditFilter) => ["admin", "credits", filter] as const,
   adminCreditsAll: ["admin", "credits"] as const,
   movements: ["movements"] as const,
+  slotsSettings: ["admin", "slots-settings"] as const,
+  slotsSettingsHistory: ["admin", "slots-settings-history"] as const,
   adminAccount: (userId: string) => ["admin", "account", userId] as const,
 };
 
@@ -182,5 +184,47 @@ export function useAdminCredits(filter: CreditFilter, enabled: boolean, pageSize
       return api.get<CreditHistory>(`/backoffice/wallet/credits?${params.toString()}`);
     },
     getNextPageParam: (last) => last.nextBefore ?? undefined,
+  });
+}
+
+/** Ajustes vigentes de la tragamonedas (solo administrador). */
+export function useSlotsSettings(enabled: boolean) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.slotsSettings, queryFn: () => api.get<SlotsSettings>("/backoffice/games/slots/settings"), enabled });
+}
+
+/** Prueba una tabla SIN guardarla: devuelve el retorno y la frecuencia de premio, o por que no sirve. */
+export function useSlotsPreview(body: SlotsSettingsBody | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["admin", "slots-preview", body],
+    queryFn: () => api.post<SlotsSettingsPreview>("/backoffice/games/slots/settings/preview", body),
+    enabled: body !== null,
+    staleTime: Infinity,
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** Publica una version nueva de la tabla. Falla con 409 si otra persona publico antes. */
+export function usePublishSlotsSettings() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SlotsSettingsBody) => api.post<SlotsSettings>("/backoffice/games/slots/settings", body),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.slotsSettings }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.slotsSettingsHistory }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.paytable }),
+      ]),
+  });
+}
+
+export function useSlotsSettingsHistory(enabled: boolean) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.slotsSettingsHistory,
+    queryFn: () => api.get<SlotsSettingsHistoryItem[]>("/backoffice/games/slots/settings/history?limit=25"),
+    enabled,
   });
 }
