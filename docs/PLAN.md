@@ -134,6 +134,7 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 
 - [ ] Agente de juego responsable que analiza eventos y propone límites
 - [ ] Agente de soporte que consulta historial y explica jugadas
+- [x] Crash: juego en vivo con ronda compartida y provably fair por ronda (ADR 0009, `docs/juego-crash.md`)
 - [ ] Blackjack multijugador en tiempo real
 - [ ] Torneos con leaderboard en Redis
 - [ ] Deploy en Azure Container Apps con Bicep

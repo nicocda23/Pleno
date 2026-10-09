@@ -20,7 +20,8 @@ public static class GamesEndpointFilters
             var status = ex.Error switch
             {
                 GamesError.RoundNotFound => StatusCodes.Status404NotFound,
-                GamesError.BetKeyReused or GamesError.SettingsConflict => StatusCodes.Status409Conflict,
+                GamesError.BetKeyReused or GamesError.SettingsConflict or GamesError.BettingClosed or GamesError.RoundNotRunning
+                    or GamesError.CrashedAlready or GamesError.BetNotActive => StatusCodes.Status409Conflict,
                 _ => StatusCodes.Status400BadRequest,
             };
             return Results.Problem(statusCode: status, title: ex.Error.ToString(), detail: ex.Message);

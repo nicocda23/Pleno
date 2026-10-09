@@ -10,6 +10,18 @@ public enum GamesError
     RoundNotFound,
     InvalidSettings,
     SettingsConflict,
+
+    /// <summary>No hay una ronda abierta para apostar (o ya se cerro el plazo).</summary>
+    BettingClosed,
+
+    /// <summary>La ronda no esta en el momento que la operacion necesita.</summary>
+    RoundNotRunning,
+
+    /// <summary>El cohete exploto antes de que el retiro llegara.</summary>
+    CrashedAlready,
+
+    /// <summary>La apuesta ya no esta en juego (ya retiro, ya perdio o nunca se reservo).</summary>
+    BetNotActive,
 }
 
 public sealed class GamesDomainException(GamesError error, string message) : Exception(message)

@@ -38,6 +38,11 @@ interfaz: una pagina React con PixiJS, HTML y CSS, o una pagina JS que se resuel
   sus rutas dejan de existir. Un id desconocido en esa lista impide arrancar (para no dejar nada "a medias").
 - **Del todo:** quitarlo de `AvailableGames.All()` (y su pagina del registro del front).
 
+## Juegos en vivo (ejemplo: Crash)
+Un juego de ronda compartida (Crash) usa lo mismo y suma dos piezas de la plataforma: la **difusion a todos los jugadores** (`GameBroadcast`, por RabbitMQ y SignalR) y un
+**plazo propio para la reserva** de la Wallet (`ReserveStake.TtlSeconds`) cuando la ronda dura mas que el plazo por defecto. Su motor de rondas es un servicio en segundo
+plano registrado por el propio modulo. Ver `docs/juego-crash.md`.
+
 ## Un juego en su propio proceso
 El servicio de juegos es un solo programa que carga los modulos habilitados. Si un juego necesita su propio proceso (por ejemplo uno en vivo
 y compartido), se levanta el mismo programa con `Games:Enabled` = ese juego y se enruta por el gateway. Cada despliegue tiene su `gamesdb`.
