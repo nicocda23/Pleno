@@ -101,6 +101,34 @@ public class RouletteRoundTests
         round.BetType = RouletteBetType.Straight;
         round.Selection = [17];
 
-        Assert.Equal(3_600, round.ToBet().PayoutFor(17) * 1);
+        Assert.Equal(3_600, round.ToBets().Single().PayoutFor(17));
+    }
+
+    [Fact]
+    public void A_round_saved_with_a_single_bet_in_the_old_format_still_reads_as_one_bet()
+    {
+        var round = Placed();
+        round.BetType = RouletteBetType.Red;
+        round.Selection = [];
+        round.Stake = 100;
+        round.Bets = []; // asi quedaron guardadas las rondas anteriores a las tiradas con varias apuestas
+
+        var bet = Assert.Single(round.AllBets());
+
+        Assert.Equal(RouletteBetType.Red, bet.BetType);
+        Assert.Equal(100, bet.Stake);
+    }
+
+    [Fact]
+    public void A_round_with_several_bets_rebuilds_all_of_them()
+    {
+        var round = Placed();
+        round.Bets =
+        [
+            new RoundBet { BetType = RouletteBetType.Red, Stake = 100 },
+            new RoundBet { BetType = RouletteBetType.Straight, Selection = [7], Stake = 10 },
+        ];
+
+        Assert.Equal(2, round.ToBets().Count);
     }
 }

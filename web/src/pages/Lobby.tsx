@@ -3,7 +3,7 @@ import { useAccount, useMe, useRounds } from "../api/hooks";
 import { BalanceChip } from "../components/BalanceChip";
 import { RoundBadge } from "../components/RoundBadge";
 import { formatChips, formatDateTime } from "../lib/format";
-import { describeBet } from "../lib/roulette";
+import { describeRound } from "../lib/roulette";
 import { outcomeText } from "../lib/messages";
 import { useRealtime } from "../realtime/RealtimeProvider";
 
@@ -81,7 +81,7 @@ export function Lobby() {
           {rounds.data?.map((round) => (
             <li key={round.betId} className="list__row">
               <span>
-                <strong>{describeBet(round.betType, round.selection)}</strong>
+                <strong>{describeRound(round)}</strong>
                 <span className="muted"> · {formatChips(round.stake)} · {formatDateTime(round.placedAt)}</span>
               </span>
               <span className="list__end">

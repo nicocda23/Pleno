@@ -130,11 +130,30 @@ export function outsideSpots(): Spot[] {
 
 export const allSpots = (): Spot[] => [...numberSpots(), ...edgeSpots(), ...outsideSpots()];
 
-/** Estado de una apuesta: cuanto se aposto y donde. Una sola apuesta por tirada (por ahora). */
+/** Lo apostado en un lugar del tapete. */
 export interface PlacedChips {
   spot: Spot;
   stake: number;
 }
+
+/** Cada toque en el tapete pone una ficha de cierto valor en un lugar. */
+export interface ChipDrop {
+  spot: Spot;
+  amount: number;
+}
+
+/** Junta las fichas por lugar (en el orden en que se pusieron). Se puede apostar a muchos lugares a la vez, incluso opuestos (rojo y negro). */
+export function aggregateChips(drops: readonly ChipDrop[]): PlacedChips[] {
+  const byId = new Map<string, PlacedChips>();
+  for (const { spot, amount } of drops) {
+    const current = byId.get(spot.id);
+    if (current) current.stake += amount;
+    else byId.set(spot.id, { spot, stake: amount });
+  }
+  return [...byId.values()];
+}
+
+export const totalStake = (placed: readonly PlacedChips[]): number => placed.reduce((sum, p) => sum + p.stake, 0);
 
 const DENOMINATIONS = [500, 100, 50, 10, 1] as const;
 

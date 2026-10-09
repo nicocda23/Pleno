@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ApiError } from "../api/client";
 import type { PlacedBet } from "../api/types";
@@ -56,7 +56,7 @@ describe("Roulette table", () => {
 
     await waitFor(() => expect(betCalls(api)).toHaveLength(1));
     const call = betCalls(api)[0]!;
-    expect(call.body).toEqual({ betType: "Black", selection: [], stake: 50 });
+    expect(call.body).toEqual({ bets: [{ betType: "Black", selection: [], stake: 50 }] });
     expect(call.headers?.["Idempotency-Key"]).toMatch(/^[0-9a-f-]{36}$/);
     expect(await screen.findByText(/La ruleta está girando/)).toBeInTheDocument();
 
@@ -76,31 +76,64 @@ describe("Roulette table", () => {
     await userEvent.click(screen.getByRole("button", { name: /Apostar 10 fichas/ }));
 
     await waitFor(() => expect(betCalls(api)).toHaveLength(1));
-    expect(betCalls(api)[0]!.body).toEqual({ betType: "Split", selection: [17, 20], stake: 10 });
+    expect(betCalls(api)[0]!.body).toEqual({ bets: [{ betType: "Split", selection: [17, 20], stake: 10 }] });
   });
 
-  it("adds chips when the same place is tapped again, and a different place starts over", async () => {
+  it("lets the player bet on several places at once, even red and black, and sends them as one spin", async () => {
+    const api = apiWith();
+    renderApp(<Roulette />, { api });
+
+    await userEvent.click(screen.getByRole("radio", { name: "100" }));
+    await bet("Rojo");
+    await userEvent.click(screen.getByRole("radio", { name: "50" }));
+    await userEvent.click(spot("Negro")); // legal: una de las dos pierde seguro, pero no hay regla que lo impida
+    await userEvent.click(screen.getByRole("radio", { name: "10" }));
+    await userEvent.click(spot("Pleno 7"));
+    await userEvent.click(spot("Columna 1"));
+
+    expect(spot("Rojo")).toHaveAttribute("aria-pressed", "true");
+    expect(spot("Negro")).toHaveAttribute("aria-pressed", "true");
+    expect(within(screen.getByRole("list", { name: "Tus apuestas" })).getAllByRole("listitem")).toHaveLength(4);
+    expect(screen.getByText(/Total apostado/)).toHaveTextContent("170");
+
+    await userEvent.click(screen.getByRole("button", { name: "Apostar 170 fichas" }));
+
+    await waitFor(() => expect(betCalls(api)).toHaveLength(1));
+    expect(betCalls(api)[0]!.body).toEqual({
+      bets: [
+        { betType: "Red", selection: [], stake: 100 },
+        { betType: "Black", selection: [], stake: 50 },
+        { betType: "Straight", selection: [7], stake: 10 },
+        { betType: "Column", selection: [1], stake: 10 },
+      ],
+    });
+  });
+
+  it("adds chips when the same place is tapped again", async () => {
     renderApp(<Roulette />, { api: apiWith() });
 
     await bet("Pleno 7");
     await userEvent.click(spot("Pleno 7"));
-    expect(screen.getByRole("button", { name: "Apostar 20 fichas" })).toBeInTheDocument();
-    expect(screen.getByText(/cobrás/)).toHaveTextContent("720"); // 20 x 36
 
-    await userEvent.click(spot("Pleno 8"));
-    expect(screen.getByRole("button", { name: "Apostar 10 fichas" })).toBeInTheDocument();
-    expect(spot("Pleno 8")).toHaveAttribute("aria-pressed", "true");
-    expect(spot("Pleno 7")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Apostar 20 fichas" })).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Tus apuestas" })).getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByRole("list", { name: "Tus apuestas" })).toHaveTextContent("cobrás 720"); // 20 x 36
   });
 
-  it("clears the chips from the board", async () => {
+  it("undoes the last chip and clears everything", async () => {
     renderApp(<Roulette />, { api: apiWith() });
     await bet("Pleno 7");
+    await userEvent.click(spot("Pleno 8"));
+    await userEvent.click(spot("Pleno 8"));
+    expect(screen.getByRole("button", { name: "Apostar 30 fichas" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Quitar fichas" }));
+    await userEvent.click(screen.getByRole("button", { name: "Deshacer" }));
+    expect(screen.getByRole("button", { name: "Apostar 20 fichas" })).toBeInTheDocument();
 
+    await userEvent.click(screen.getByRole("button", { name: "Quitar todo" }));
     expect(screen.getByRole("button", { name: "Apostar" })).toBeDisabled();
     expect(spot("Pleno 7")).toHaveAttribute("aria-pressed", "false");
+    expect(spot("Pleno 8")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("locks the board while the wheel is spinning", async () => {
@@ -111,7 +144,7 @@ describe("Roulette table", () => {
     await screen.findByText(/La ruleta está girando/);
 
     expect(spot("Pleno 8")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Quitar fichas" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Quitar todo" })).toBeDisabled();
   });
 
   it("shows a loss without celebrating", async () => {

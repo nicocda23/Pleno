@@ -20,8 +20,18 @@ public enum RoundStatus
     Voided = 5,
 }
 
+/// <summary>Una apuesta dentro de una tirada (el tipo, lo que se eligio y las fichas puestas ahi).</summary>
+public sealed class RoundBet
+{
+    public RouletteBetType BetType { get; set; }
+
+    public List<int> Selection { get; set; } = [];
+
+    public long Stake { get; set; }
+}
+
 /// <summary>
-/// Una apuesta de ruleta de punta a punta. Cada transicion es idempotente: aplicar dos veces el mismo mensaje
+/// Una tirada de ruleta de punta a punta: UNA o varias apuestas que comparten un nonce, un numero sorteado y una reserva en la Wallet. Cada transicion es idempotente: aplicar dos veces el mismo mensaje
 /// (entrega "al menos una vez") deja la ronda igual y devuelve false.
 /// </summary>
 public sealed class RouletteRound
@@ -33,11 +43,17 @@ public sealed class RouletteRound
 
     public Guid AccountId { get; set; }
 
+    /// <summary>Tipo de la primera apuesta (se conserva por compatibilidad; el detalle completo esta en <see cref="Bets"/>).</summary>
     public RouletteBetType BetType { get; set; }
 
+    /// <summary>Seleccion de la primera apuesta (ver <see cref="BetType"/>).</summary>
     public List<int> Selection { get; set; } = [];
 
+    /// <summary>Total de fichas de la tirada: es lo que reserva la Wallet.</summary>
     public long Stake { get; set; }
+
+    /// <summary>Todas las apuestas de la tirada. Vacia en rondas viejas, de una sola apuesta: ahi vale (BetType, Selection, Stake).</summary>
+    public List<RoundBet> Bets { get; set; } = [];
 
     /// <summary>Par de seeds y nonce asignados por el servidor al colocar la apuesta (antes de conocer el resultado).</summary>
     public Guid PairId { get; set; }
@@ -62,7 +78,11 @@ public sealed class RouletteRound
 
     public bool IsClosed => Status is RoundStatus.Settled or RoundStatus.Rejected or RoundStatus.Voided;
 
-    public RouletteBet ToBet() => RouletteBet.Create(BetType, Selection, Stake);
+    /// <summary>Las apuestas de la tirada, tambien para las rondas viejas que guardaron una sola.</summary>
+    public IReadOnlyList<RoundBet> AllBets() =>
+        Bets.Count > 0 ? Bets : [new RoundBet { BetType = BetType, Selection = Selection, Stake = Stake }];
+
+    public IReadOnlyList<RouletteBet> ToBets() => [.. AllBets().Select(b => RouletteBet.Create(b.BetType, b.Selection, b.Stake))];
 
     public bool MarkResolved(int winningNumber, long payout)
     {

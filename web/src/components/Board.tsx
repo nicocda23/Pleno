@@ -4,7 +4,8 @@ import { formatChips } from "../lib/format";
 import { pocketColor } from "../lib/roulette";
 
 interface Props {
-  placed: PlacedChips | null;
+  /** Lo apostado hasta ahora: se puede apostar a varios lugares a la vez. */
+  placed: readonly PlacedChips[];
   disabled: boolean;
   /** Numero ganador de la ultima tirada, para resaltarlo en el tapete. */
   winning: number | null;
@@ -20,11 +21,13 @@ export function Board({ placed, disabled, winning, onPick }: Props) {
   const dozens = outside.filter((s) => s.kind === "dozen");
   const columns = outside.filter((s) => s.kind === "column");
   const chances = outside.filter((s) => s.kind === "outside");
-  const isPlaced = (s: Spot) => placed?.spot.id === s.id;
+  const stakes = useMemo(() => new Map(placed.map((p) => [p.spot.id, p.stake])), [placed]);
+  const isPlaced = (s: Spot) => stakes.has(s.id);
 
   const numberButton = (n: number, style: React.CSSProperties) => {
     const id = `Straight:${n}`;
-    const on = placed?.spot.id === id;
+    const stake = stakes.get(id);
+    const on = stake !== undefined;
     return (
       <button
         key={n}
@@ -37,7 +40,7 @@ export function Board({ placed, disabled, winning, onPick }: Props) {
         onClick={() => onPick({ id, kind: "number", betType: "Straight", selection: [n], covered: 1, multiplier: 36, label: `Pleno ${n}` })}
       >
         {n}
-        {on && <Stack stake={placed!.stake} />}
+        {stake !== undefined && <Stack stake={stake} />}
       </button>
     );
   };
@@ -62,7 +65,7 @@ export function Board({ placed, disabled, winning, onPick }: Props) {
             style={{ left: `${((s.x! + 1) / (COLUMNS + 1)) * 100}%`, top: `${(s.y! / ROWS) * 100}%` }}
             onClick={() => onPick(s)}
           >
-            {isPlaced(s) && <Stack stake={placed!.stake} />}
+            {isPlaced(s) && <Stack stake={stakes.get(s.id)!} />}
           </button>
         ))}
       </div>
@@ -70,17 +73,17 @@ export function Board({ placed, disabled, winning, onPick }: Props) {
       <div className="board__outside">
         <div className="board__row board__row--3">
           {dozens.map((s) => (
-            <OutsideButton key={s.id} spot={s} text={`${s.selection[0]}ª docena`} on={isPlaced(s)} disabled={disabled} stake={placed?.stake} onPick={onPick} />
+            <OutsideButton key={s.id} spot={s} text={`${s.selection[0]}ª docena`} on={isPlaced(s)} disabled={disabled} stake={stakes.get(s.id)} onPick={onPick} />
           ))}
         </div>
         <div className="board__row board__row--3">
           {columns.map((s) => (
-            <OutsideButton key={s.id} spot={s} text={`Columna ${s.selection[0]}`} on={isPlaced(s)} disabled={disabled} stake={placed?.stake} onPick={onPick} />
+            <OutsideButton key={s.id} spot={s} text={`Columna ${s.selection[0]}`} on={isPlaced(s)} disabled={disabled} stake={stakes.get(s.id)} onPick={onPick} />
           ))}
         </div>
         <div className="board__row board__row--6">
           {chances.map((s) => (
-            <OutsideButton key={s.id} spot={s} text={OUTSIDE_NAMES[s.betType]!} on={isPlaced(s)} disabled={disabled} stake={placed?.stake} onPick={onPick} tone={s.betType === "Red" ? "red" : s.betType === "Black" ? "black" : undefined} />
+            <OutsideButton key={s.id} spot={s} text={OUTSIDE_NAMES[s.betType]!} on={isPlaced(s)} disabled={disabled} stake={stakes.get(s.id)} onPick={onPick} tone={s.betType === "Red" ? "red" : s.betType === "Black" ? "black" : undefined} />
           ))}
         </div>
       </div>

@@ -45,7 +45,10 @@ navegador guarde secretos ni pueda inventar su identidad.
   hasta que la bola se detiene; recién ahí aparecen el saldo nuevo, el aviso emergente y el panel de resultado.
 - **Tapete generado y verificado:** `lib/board.ts` produce las 157 apuestas legales (37 plenos, 60 caballos, 12 calles, 2 tríos,
   22 cuadros, 1 primeros cuatro, 11 seisenas, 12 exteriores) y una prueba comprueba que ninguna sería rechazada por la API.
-- **Una apuesta por tirada:** el backend crea una ronda (y un nonce) por apuesta. Varias apuestas en una misma tirada requieren
-  cambiar el modelo del servidor; queda como paso posterior (3c).
+- **Varias apuestas por tirada (3c):** una tirada es una ronda con una lista de apuestas que comparten UN nonce, UN número sorteado
+  y UNA reserva en la Wallet por el total. El pago es la suma de lo que paga cada apuesta. Apostar a la vez a rojo y negro (o a un pleno
+  y a su columna) es legal en la ruleta real y también acá. Si el total supera el saldo, se rechaza la tirada entera. La
+  idempotencia compara la tirada sin importar el orden de las apuestas. El formato viejo de una sola apuesta sigue funcionando y las
+  rondas ya guardadas se leen como una tirada de una apuesta.
 - **Accesibilidad:** con "reducir movimiento" la rueda se asienta al instante; la rueda expone texto alternativo y `data-state`.
 - **Carga diferida:** PixiJS pesa mucho, así que la página de la ruleta se descarga recién al entrar a ella.

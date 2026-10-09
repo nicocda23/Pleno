@@ -1,5 +1,5 @@
 import type { RouletteBetType } from "../api/types";
-import { allSpots, cellOf, chipBreakdown, COLUMNS, edgeSpots, numberSpots, outsideSpots, ROWS, type Spot } from "./board";
+import { aggregateChips, allSpots, cellOf, chipBreakdown, COLUMNS, edgeSpots, numberSpots, outsideSpots, ROWS, totalStake, type Spot } from "./board";
 
 // Port de las reglas del servidor (src/Modules/Games/Roulette/RouletteBet.cs), solo para comprobar que el tapete
 // no ofrece NUNCA una apuesta que la API rechazaria.
@@ -147,5 +147,40 @@ describe("chipBreakdown", () => {
   it("ignores negatives and decimals", () => {
     expect(chipBreakdown(-5)).toEqual([]);
     expect(chipBreakdown(10.9)).toEqual([{ value: 10, count: 1 }]);
+  });
+});
+
+describe("aggregateChips", () => {
+  const spots = allSpots();
+  const red = spots.find((s) => s.id === "Red:")!;
+  const black = spots.find((s) => s.id === "Black:")!;
+  const seven = spots.find((s) => s.id === "Straight:7")!;
+
+  it("lets the player bet on many places at once, even opposite ones like red and black", () => {
+    const placed = aggregateChips([
+      { spot: red, amount: 100 },
+      { spot: black, amount: 50 },
+      { spot: seven, amount: 10 },
+    ]);
+
+    expect(placed.map((p) => p.spot.id)).toEqual(["Red:", "Black:", "Straight:7"]);
+    expect(totalStake(placed)).toBe(160);
+  });
+
+  it("adds up the chips dropped on the same place, keeping the order of first touch", () => {
+    const placed = aggregateChips([
+      { spot: seven, amount: 10 },
+      { spot: red, amount: 5 },
+      { spot: seven, amount: 50 },
+    ]);
+
+    expect(placed).toHaveLength(2);
+    expect(placed[0]).toMatchObject({ stake: 60 });
+    expect(placed[0]!.spot.id).toBe("Straight:7");
+  });
+
+  it("is empty with nothing placed", () => {
+    expect(aggregateChips([])).toEqual([]);
+    expect(totalStake([])).toBe(0);
   });
 });
