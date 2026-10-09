@@ -94,6 +94,45 @@ export interface PlacedBet {
   alreadyPlaced: boolean;
 }
 
+/** Un giro de tragamonedas. */
+export interface Spin {
+  betId: string;
+  status: RoundStatus;
+  stake: number;
+  /** Nombre del simbolo de cada rodillo (vacio hasta que se sortea). */
+  reels: string[];
+  multiplier: number | null;
+  payout: number | null;
+  pairId: string;
+  nonce: number;
+  failureReason: string | null;
+  placedAt: string;
+}
+
+export interface PaytableSymbol {
+  name: string;
+  weight: number;
+  triplePayout: number;
+}
+
+export interface LeadingPay {
+  symbol: string;
+  count: number;
+  payout: number;
+}
+
+/** Tabla de pagos publica de la tragamonedas. */
+export interface Paytable {
+  reels: number;
+  symbols: PaytableSymbol[];
+  leadingPays: LeadingPay[];
+  minStake: number;
+  maxStake: number;
+  totalWeight: number;
+  returnToPlayerPercent: number;
+  hitRatePercent: number;
+}
+
 export interface RetiredPair {
   pairId: string;
   commitment: string;

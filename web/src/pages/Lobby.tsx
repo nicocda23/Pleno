@@ -17,7 +17,7 @@ interface GameCard {
 
 const GAMES: GameCard[] = [
   { id: "roulette", name: "Ruleta europea", tagline: "37 casilleros, 15 tipos de apuesta. Cada tirada se puede verificar.", to: "/ruleta", glyph: "◎" },
-  { id: "slots", name: "Tragamonedas", tagline: "Tabla de pagos configurable.", glyph: "♣" },
+  { id: "slots", name: "Tragamonedas", tagline: "3 rodillos, premios desde x1 hasta x100 y retorno publicado.", to: "/tragamonedas", glyph: "♣" },
   { id: "blackjack", name: "Blackjack", tagline: "Mesas multijugador en tiempo real.", glyph: "♠" },
   { id: "poker", name: "Poker", tagline: "Torneos con tabla de posiciones.", glyph: "♦" },
 ];
