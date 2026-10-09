@@ -4,7 +4,9 @@
     <Project Path="src/Casino.AppHost/Casino.AppHost.csproj" />
     <Project Path="src/Casino.BuildingBlocks/Casino.BuildingBlocks.csproj" />
     <Project Path="src/Casino.Contracts/Casino.Contracts.csproj" />
+    <Project Path="src/Casino.Hosting/Casino.Hosting.csproj" />
     <Project Path="src/Casino.ServiceDefaults/Casino.ServiceDefaults.csproj" />
+    <Project Path="src/Casino.WalletService/Casino.WalletService.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/Games/">

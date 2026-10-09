@@ -17,7 +17,7 @@ namespace Casino.Integration.Tests.Games;
 [Collection(WalletDbDefinition.Name)]
 public sealed class SlotsFlowTests(PostgresFixture db, RabbitMqFixture rabbit) : IDisposable
 {
-    private readonly List<WebApplicationFactory<Program>> _apps = [];
+    private readonly List<CasinoCluster> _apps = [];
 
     public void Dispose()
     {
@@ -27,14 +27,14 @@ public sealed class SlotsFlowTests(PostgresFixture db, RabbitMqFixture rabbit) :
         }
     }
 
-    private WebApplicationFactory<Program> StartApp()
+    private CasinoCluster StartApp()
     {
         var app = TestAuth.StartApp(db, rabbit);
         _apps.Add(app);
         return app;
     }
 
-    private static async Task<(Guid UserId, Guid AccountId)> FundedPlayerAsync(WebApplicationFactory<Program> app, long chips)
+    private static async Task<(Guid UserId, Guid AccountId)> FundedPlayerAsync(CasinoCluster app, long chips)
     {
         var userId = Guid.NewGuid();
         var wallet = app.Services.GetRequiredService<WalletService>();

@@ -28,6 +28,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\Wallet\Casino.Modules.Wallet.csproj" />
     <ProjectReference Include="..\..\src\Casino.Api\Casino.Api.csproj" />
+    <ProjectReference Include="..\..\src\Casino.WalletService\Casino.WalletService.csproj" />
     <ProjectReference Include="..\..\src\Modules\Games\Casino.Modules.Games.csproj" />
     <ProjectReference Include="..\..\src\Casino.Contracts\Casino.Contracts.csproj" />
   </ItemGroup>
