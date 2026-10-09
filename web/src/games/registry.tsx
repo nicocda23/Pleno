@@ -19,11 +19,11 @@ export interface GamePage {
 export const GAME_PAGES: readonly GamePage[] = [
   { id: "roulette", route: "ruleta", component: lazy(() => import("../pages/Roulette").then((m) => ({ default: m.Roulette }))) },
   { id: "slots", route: "tragamonedas", component: lazy(() => import("../pages/Slots").then((m) => ({ default: m.Slots }))) },
+  { id: "crash", route: "crash", component: lazy(() => import("../pages/Crash").then((m) => ({ default: m.Crash }))) },
 ];
 
 /** Lo que viene en el roadmap y todavia no existe: se muestra como "Proximamente" (no depende del servidor). */
 export const COMING_SOON: readonly Pick<GameInfo, "id" | "name" | "tagline" | "glyph">[] = [
-  { id: "crash", name: "Crash", tagline: "Un cohete sube y vos decidis cuando retirar.", glyph: "▲" },
   { id: "blackjack", name: "Blackjack", tagline: "Mesas multijugador en tiempo real.", glyph: "♠" },
   { id: "poker", name: "Poker", tagline: "Torneos con tabla de posiciones.", glyph: "♦" },
 ];

@@ -20,11 +20,13 @@ public static class MessagingTopology
     public const string WalletBalanceEventsExchange = "wallet.balance-events";
     public const string GamesEventsExchange = "games.events";
     public const string UsersEventsExchange = "users.events";
+    public const string GamesBroadcastExchange = "games.broadcast";
 
     public const string GamesWalletEventsQueue = "games.wallet-events";
     public const string RealtimeWalletEventsQueue = "realtime.wallet-events";
     public const string RealtimeGameEventsQueue = "realtime.game-events";
     public const string WalletUserEventsQueue = "wallet.user-events";
+    public const string RealtimeGameBroadcastQueue = "realtime.game-broadcast";
 
     /// <summary>Declara colas, intercambios y uniones de todo el sistema. Idempotente.</summary>
     public static void Declare(RabbitMqTransportExpression broker)
@@ -52,6 +54,13 @@ public static class MessagingTopology
         {
             exchange.ExchangeType = ExchangeType.Fanout;
             exchange.BindQueue(RealtimeGameEventsQueue);
+        });
+
+        // Hechos en vivo de los juegos para todos los jugadores (por ejemplo, las rondas de Crash): los consume el tiempo real.
+        broker.DeclareExchange(GamesBroadcastExchange, exchange =>
+        {
+            exchange.ExchangeType = ExchangeType.Fanout;
+            exchange.BindQueue(RealtimeGameBroadcastQueue);
         });
 
         // Hechos de usuarios: la Wallet abre la cuenta cuando entra un jugador nuevo.

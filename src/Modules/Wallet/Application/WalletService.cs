@@ -76,6 +76,10 @@ public sealed partial class WalletService(
     public Task<OperationOutcome> ReserveAsync(Guid accountId, string key, Guid reservationId, long stake, CancellationToken ct = default) =>
         ExecuteAsync(accountId, a => a.Reserve(key, reservationId, stake, clock.GetUtcNow()), ct);
 
+    /// <param name="ttl">Cuanto puede quedar abierta esta reserva antes de liberarse sola (un juego de ronda larga pide mas que el plazo por defecto).</param>
+    public Task<OperationOutcome> ReserveAsync(Guid accountId, string key, Guid reservationId, long stake, TimeSpan ttl, CancellationToken ct = default) =>
+        ExecuteAsync(accountId, a => a.Reserve(key, reservationId, stake, clock.GetUtcNow()), ct, ttl);
+
     public Task<OperationOutcome> SettleAsync(Guid accountId, string key, Guid reservationId, long payout, CancellationToken ct = default) =>
         ExecuteAsync(accountId, a => a.Settle(key, reservationId, payout, clock.GetUtcNow()), ct);
 
@@ -123,7 +127,7 @@ public sealed partial class WalletService(
     /// Carga, decide, y guarda con concurrencia optimista. Si otro escribio primero (o la conexion fallo),
     /// recarga y reintenta con la MISMA IdempotencyKey, asi un commit incierto nunca duplica la operacion.
     /// </summary>
-    private async Task<OperationOutcome> ExecuteAsync(Guid accountId, Func<WalletAccount, OperationOutcome> operation, CancellationToken ct)
+    private async Task<OperationOutcome> ExecuteAsync(Guid accountId, Func<WalletAccount, OperationOutcome> operation, CancellationToken ct, TimeSpan? ttl = null)
     {
         for (var attempt = 1; ; attempt++)
         {
@@ -177,7 +181,7 @@ public sealed partial class WalletService(
                     {
                         await outboxSession.PublishAsync(
                             new ExpireReservation(reserved.ReservationId, accountId),
-                            reservationTtl ?? DefaultReservationTtl);
+                            ttl ?? reservationTtl ?? DefaultReservationTtl);
                     }
 
                 }

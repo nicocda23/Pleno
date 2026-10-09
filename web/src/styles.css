@@ -379,3 +379,21 @@ a { color: inherit; }
 .admin-leading label { display: flex; align-items: center; gap: 6px; }
 .admin-leading label input { width: 72px; }
 .slots-preview--stale { opacity: 0.55; }
+
+/* ---- Crash ---- */
+.crash-stage { position: relative; border: 2px solid var(--gold); border-radius: var(--radius); overflow: hidden; background: #0b1220; }
+.crash-canvas { display: block; width: 100%; height: auto; }
+.crash-multiplier { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-size: clamp(2.4rem, 10vw, 4.2rem); font-weight: 900; font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 2px 14px rgb(0 0 0 / 0.7); pointer-events: none; }
+.crash-multiplier--running { color: var(--win); }
+.crash-multiplier--crashed { color: var(--loss); }
+.crash-multiplier--betting, .crash-multiplier--waiting, .crash-multiplier--aborted { color: transparent; }
+.win-modal__box .crash-multiplier { position: static; }
+.crash-status { margin: 10px 0 0; font-weight: 700; }
+.crash-history { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.crash-pill { padding: 3px 10px; border-radius: 999px; font-weight: 800; font-size: 0.85rem; font-variant-numeric: tabular-nums; border: 1px solid var(--line); }
+.crash-pill--high { color: var(--win); border-color: var(--win); }
+.crash-pill--low { color: var(--loss); border-color: var(--loss); }
+.crash-proof { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 10px 0; }
+.crash-proof dt { color: var(--muted); }
+.crash-proof dd { margin: 0; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .crash-multiplier { text-shadow: none; } }

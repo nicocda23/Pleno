@@ -26,6 +26,9 @@ internal static class CasinoInfrastructure
         options.ListenToRabbitQueue(MessagingTopology.RealtimeWalletEventsQueue).UseDurableInbox();
         options.ListenToRabbitQueue(MessagingTopology.RealtimeGameEventsQueue).UseDurableInbox();
 
+        // Hechos en vivo de los juegos de ronda compartida: se reenvian a todos los navegadores conectados.
+        options.ListenToRabbitQueue(MessagingTopology.RealtimeGameBroadcastQueue).UseDurableInbox();
+
         // Hechos de usuarios: la Wallet abre la cuenta cuando entra un jugador nuevo.
         options.PublishMessage<UserRegistered>().ToRabbitExchange(MessagingTopology.UsersEventsExchange);
     }

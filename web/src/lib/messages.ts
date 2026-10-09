@@ -10,6 +10,10 @@ const ERRORS: Record<string, string> = {
   AccountNotFound: "Tu cuenta todavía se está preparando. Intentá en unos segundos.",
   PendingBets: "Tenés apuestas sin resolver. Esperá a que terminen.",
   NetworkError: "No hay conexión con el servidor. Revisá tu red e intentá de nuevo.",
+  BettingClosed: "Ya se cerró la ronda: esperá a la siguiente para apostar.",
+  RoundNotRunning: "El cohete todavía no empezó a subir.",
+  CrashedAlready: "El cohete explotó antes de que llegara tu retiro.",
+  BetNotActive: "Esa apuesta ya no está en juego.",
 };
 
 export function errorMessage(error: unknown): string {

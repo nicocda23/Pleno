@@ -17,5 +17,8 @@ internal static class GamesMessaging
 
         // Rondas cerradas: las consume el tiempo real para avisar al jugador.
         options.PublishMessage<RoundClosed>().ToRabbitExchange(MessagingTopology.GamesEventsExchange);
+
+        // Hechos en vivo para todos los jugadores (juegos de ronda compartida): el tiempo real los reenvia a los navegadores.
+        options.PublishMessage<GameBroadcast>().ToRabbitExchange(MessagingTopology.GamesBroadcastExchange);
     }
 }
