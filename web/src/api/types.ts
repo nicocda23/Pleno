@@ -311,3 +311,72 @@ export interface RoundClosedNotice {
   payout: number;
   failureReason: string | null;
 }
+
+/** Una mesa de Blackjack. `phase` es null si todavia no hay ninguna mano. */
+export interface BlackjackTable {
+  id: string;
+  name: string;
+  minStake: number;
+  maxStake: number;
+  maxSeats: number;
+  phase: BlackjackPhase | null;
+  players: number;
+}
+
+export type BlackjackPhase = "Betting" | "Playing" | "Finished" | "Aborted";
+export type BlackjackHand = "Waiting" | "Playing" | "Stood" | "Bust" | "Blackjack";
+export type BlackjackResult = "Blackjack" | "Win" | "Push" | "Lose" | "Bust";
+
+export interface BlackjackRound {
+  id: string;
+  tableId: string;
+  phase: BlackjackPhase;
+  commitment: string;
+  openedAt: string;
+  /** null hasta la primera apuesta. */
+  bettingEndsAt: string | null;
+  finishedAt: string | null;
+  seatCount: number;
+  /** `hiddenCards` son las que estan boca abajo (la tapada no viaja hasta que se da vuelta). */
+  dealer: { cards: number[]; hiddenCards: number };
+  activeSeat: number | null;
+  turnEndsAt: string | null;
+  serverSeed: string | null;
+}
+
+/** Un asiento: la mano es publica pero no dice de quien es. `betId` solo viene en el propio. */
+export interface BlackjackSeat {
+  seat: number | null;
+  stake: number;
+  cards: number[];
+  hand: BlackjackHand;
+  result: BlackjackResult | null;
+  payout: number | null;
+  status: RoundStatus;
+  mine: boolean;
+  betId: string | null;
+}
+
+export interface BlackjackTableState {
+  serverNow: string;
+  table: BlackjackTable;
+  bettingSeconds: number;
+  turnSeconds: number;
+  round: BlackjackRound | null;
+  seats: BlackjackSeat[];
+}
+
+export interface BlackjackBet {
+  betId: string;
+  roundId: string;
+  tableId: string;
+  status: RoundStatus;
+  stake: number;
+  seat: number;
+  cards: number[];
+  hand: BlackjackHand;
+  result: BlackjackResult | null;
+  payout: number | null;
+  failureReason: string | null;
+  placedAt: string;
+}

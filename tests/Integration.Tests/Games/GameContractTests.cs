@@ -50,7 +50,8 @@ public sealed class GameContractTests(PostgresFixture db, RabbitMqFixture rabbit
         var catalog = await player.GetFromJsonAsync<JsonElement>("/games");
 
         var cards = catalog.EnumerateArray().ToDictionary(c => c.GetProperty("id").GetString()!);
-        Assert.Equal(["crash", "roulette", "slots"], cards.Keys.Order());
+        Assert.Equal(["blackjack", "crash", "roulette", "slots"], cards.Keys.Order());
+        Assert.Equal("/blackjack", cards["blackjack"].GetProperty("route").GetString());
         Assert.Equal("/crash", cards["crash"].GetProperty("route").GetString());
         Assert.Equal("/ruleta", cards["roulette"].GetProperty("route").GetString());
         Assert.Equal("/tragamonedas", cards["slots"].GetProperty("route").GetString());
@@ -58,7 +59,7 @@ public sealed class GameContractTests(PostgresFixture db, RabbitMqFixture rabbit
         {
             Assert.False(string.IsNullOrWhiteSpace(c.GetProperty("name").GetString()));
             Assert.False(string.IsNullOrWhiteSpace(c.GetProperty("tagline").GetString()));
-            Assert.Equal("Server", c.GetProperty("resolution").GetString()); // en los tres juegos actuales decide el servidor
+            Assert.Equal("Server", c.GetProperty("resolution").GetString()); // en los juegos actuales decide el servidor
         });
         using var anonymous = cluster.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/games")).StatusCode);
@@ -120,12 +121,12 @@ public sealed class GameContractTests(PostgresFixture db, RabbitMqFixture rabbit
     [Fact]
     public async Task Enabling_a_game_that_does_not_exist_stops_the_service_at_startup()
     {
-        using var games = TestAuth.StartGamesHost(db, rabbit, customize: b => b.UseSetting("Games:Enabled:0", "blackjack"));
+        using var games = TestAuth.StartGamesHost(db, rabbit, customize: b => b.UseSetting("Games:Enabled:0", "poker"));
         _disposables.Add(games);
 
         var ex = await Assert.ThrowsAnyAsync<Exception>(() => Task.Run(() => games.CreateClient()));
 
-        Assert.Contains("blackjack", ex.ToString());
+        Assert.Contains("poker", ex.ToString());
     }
 
     [Fact]

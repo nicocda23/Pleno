@@ -22,6 +22,15 @@ public enum GamesError
 
     /// <summary>La apuesta ya no esta en juego (ya retiro, ya perdio o nunca se reservo).</summary>
     BetNotActive,
+
+    /// <summary>La mesa no existe (o el juego no la tiene configurada).</summary>
+    TableNotFound,
+
+    /// <summary>No es el turno de esa apuesta (o ya paso su tiempo).</summary>
+    NotYourTurn,
+
+    /// <summary>El jugador ya tiene una apuesta en esta mano de la mesa.</summary>
+    AlreadySeated,
 }
 
 public sealed class GamesDomainException(GamesError error, string message) : Exception(message)

@@ -14,6 +14,9 @@ const ERRORS: Record<string, string> = {
   RoundNotRunning: "El cohete todavía no empezó a subir.",
   CrashedAlready: "El cohete explotó antes de que llegara tu retiro.",
   BetNotActive: "Esa apuesta ya no está en juego.",
+  NotYourTurn: "No es tu turno (o se te acabó el tiempo).",
+  AlreadySeated: "Ya tenés un asiento en esta mano.",
+  TableNotFound: "Esa mesa no existe.",
 };
 
 export function errorMessage(error: unknown): string {

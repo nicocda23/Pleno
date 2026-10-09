@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./ApiProvider";
 import { ApiError } from "./client";
-import type { Account, CrashBet, CrashCashOut, CrashState, GameInfo, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
+import type { Account, BlackjackBet, BlackjackTable, BlackjackTableState, CrashBet, CrashCashOut, CrashState, GameInfo, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
 
 export const queryKeys = {
   spinsAll: ["spins"] as const,
@@ -20,6 +20,8 @@ export const queryKeys = {
   games: ["games"] as const,
   crashState: ["crash", "state"] as const,
   crashBets: ["crash", "bets"] as const,
+  blackjackTables: ["blackjack", "tables"] as const,
+  blackjackTable: (tableId: string) => ["blackjack", "table", tableId] as const,
   slotsSettings: ["admin", "slots-settings"] as const,
   slotsSettingsHistory: ["admin", "slots-settings-history"] as const,
   adminAccount: (userId: string) => ["admin", "account", userId] as const,
@@ -274,4 +276,43 @@ export function useCrashCashOut() {
 export function useCrashBets(limit = 10) {
   const api = useApi();
   return useQuery({ queryKey: [...queryKeys.crashBets, limit], queryFn: () => api.get<CrashBet[]>(`/games/crash/bets?limit=${limit}`) });
+}
+
+/** Las mesas de Blackjack y como esta cada una. Se refresca cada 3 s mientras se mira la lista. */
+export function useBlackjackTables() {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.blackjackTables, queryFn: () => api.get<BlackjackTable[]>("/games/blackjack/tables"), refetchInterval: 3_000 });
+}
+
+/**
+ * El estado de una mesa de Blackjack: la mano en curso y los asientos. Como en Crash, se consulta cada segundo (respaldo) y los hechos en vivo
+ * lo refrescan al instante. `offsetMs` es cuanto adelanta el reloj del servidor al del navegador, para las cuentas regresivas.
+ */
+export function useBlackjackTable(tableId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.blackjackTable(tableId ?? ""),
+    enabled: tableId !== null,
+    queryFn: async () => {
+      const sentAt = Date.now();
+      const state = await api.get<BlackjackTableState>(`/games/blackjack/tables/${tableId}`);
+      const receivedAt = Date.now();
+      return { ...state, offsetMs: Date.parse(state.serverNow) - (sentAt + receivedAt) / 2 };
+    },
+    refetchInterval: 1_000,
+  });
+}
+
+export function usePlaceBlackjackBet(tableId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: ({ stake, idempotencyKey }: { stake: number; idempotencyKey: string }) =>
+      api.post<{ betId: string; roundId: string; alreadyPlaced: boolean }>(`/games/blackjack/tables/${tableId}/bets`, { stake }, { "Idempotency-Key": idempotencyKey }),
+  });
+}
+
+/** Pedir carta o plantarse con la apuesta propia. */
+export function useBlackjackAction() {
+  const api = useApi();
+  return useMutation({ mutationFn: ({ betId, action }: { betId: string; action: "hit" | "stand" }) => api.post<BlackjackBet>(`/games/blackjack/bets/${betId}/${action}`) });
 }
