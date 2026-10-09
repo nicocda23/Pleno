@@ -231,6 +231,78 @@ public sealed class CrashFlowTests(PostgresFixture db, RabbitMqFixture rabbit) :
         Assert.Equal((1_000 - 200 + 150L, 0L), (account.Available, account.Reserved));
     }
 
+    private static readonly int[] ManualPlayers = [8, 9];
+
+    [Fact]
+    public async Task Ten_players_betting_and_cashing_out_at_the_same_time_share_one_round_and_every_balance_closes()
+    {
+        using var cluster = Start();
+        const long stake = 100;
+        // 6 con retiro automatico que llega, 2 con retiro automatico que no llega (x90 > explosion), 2 que retiran a mano a la vez.
+        decimal?[] autos = [1.20m, 1.50m, 1.80m, 2.10m, 2.40m, 2.70m, 90m, 90m, null, null];
+        var players = new List<(Guid UserId, Guid AccountId, HttpClient Client)>();
+        foreach (var _ in autos)
+        {
+            var (userId, accountId) = await FundedAsync(cluster, 1_000);
+            players.Add((userId, accountId, cluster.ClientFor(userId)));
+        }
+
+        try
+        {
+            var round = StartRound(cluster, 3_000, 4_000);
+            await WaitForPhaseAsync(players[0].Client, "Betting");
+            var roundId = (await StateAsync(players[0].Client)).GetProperty("round").GetProperty("id").GetGuid();
+
+            // Todos apuestan a la vez, en la misma ventana.
+            var betIds = await Task.WhenAll(players.Select((player, i) => Task.Run(async () => await PlacedAsync(await PlaceAsync(player.Client, stake, $"many-{i}", autos[i])))));
+            for (var i = 0; i < players.Count; i++)
+            {
+                await WaitForBetAsync(players[i].Client, betIds[i], b => b.GetProperty("inPlay").GetBoolean() || b.GetProperty("status").GetString() != "Placed", $"la apuesta {i} reservada");
+                Assert.Equal(roundId, (await BetAsync(players[i].Client, betIds[i])).GetProperty("roundId").GetGuid()); // todos en la MISMA ronda
+            }
+
+            await WaitForPhaseAsync(players[0].Client, "Running");
+
+            // Los dos manuales retiran a la vez, mientras los retiros automaticos tambien se disparan.
+            var manual = await Task.WhenAll(ManualPlayers.Select(i => Task.Run(async () => await players[i].Client.PostAsync($"/games/crash/bets/{betIds[i]}/cashout", content: null))));
+            Assert.All(manual, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+            var manualPayouts = new List<long>();
+            foreach (var response in manual)
+            {
+                var cashed = await response.Content.ReadFromJsonAsync<JsonElement>();
+                Assert.InRange(cashed.GetProperty("multiplier").GetInt64(), 100, 2_999);
+                manualPayouts.Add(cashed.GetProperty("payout").GetInt64());
+            }
+
+            await round;
+            for (var i = 0; i < players.Count; i++)
+            {
+                await WaitForBetAsync(players[i].Client, betIds[i], b => b.GetProperty("status").GetString() == "Settled", $"la apuesta {i} cerrada");
+            }
+
+            for (var i = 0; i < players.Count; i++)
+            {
+                var bet = await BetAsync(players[i].Client, betIds[i]);
+                var expectedPayout = i switch
+                {
+                    < 6 => stake * (long)(autos[i]!.Value * 100) / 100, // cobra exacto en su multiplicador
+                    < 8 => 0L, // el cohete exploto antes de x90
+                    _ => manualPayouts[i - 8],
+                };
+                Assert.Equal(expectedPayout, bet.GetProperty("payout").GetInt64());
+                var account = await cluster.Wallet.Services.GetRequiredService<WalletService>().GetAsync(players[i].AccountId);
+                Assert.Equal((1_000 - stake + expectedPayout, 0L), (account.Available, account.Reserved)); // cada saldo cierra, sin reservas colgadas
+            }
+        }
+        finally
+        {
+            foreach (var player in players)
+            {
+                player.Client.Dispose();
+            }
+        }
+    }
+
     [Fact]
     public async Task Betting_is_refused_when_no_round_is_open_or_the_window_already_closed()
     {
