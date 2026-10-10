@@ -75,3 +75,6 @@ Está pensado para usarse con el pulgar. Lo que se cuida (y se prueba en `web/e2
 Los ajustes de celular están en `@media (max-width: 640px)` de `styles.css`; los específicos de cada juego, en un bloque **al final** del archivo (para ganarle a las reglas base de cada juego).
 `npm --prefix web run e2e -- --project=mobile` corre solo las pruebas de celular (necesita `aspire start`).
 
+### Cartas del Truco
+Las cartas del Truco son de la **baraja española** (`web/src/components/SpanishCard.tsx`): espadas, bastos, oros y copas dibujados como tales (espada, garrote con hojas, moneda y cáliz), con los números 1 a 7 acomodados como en el mazo real y la sota (10), el caballo (11) y el rey (12) como personajes. Son SVG propios, sin imágenes ni dependencias, y escalan al tamaño de la carta (66 x 99 px en la mesa y 52 x 78 en el celular). El nombre accesible sigue siendo "7 de espadas".
+

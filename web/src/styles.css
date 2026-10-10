@@ -593,10 +593,8 @@ button.uno-card--playable:hover { transform: translateY(-14px); }
 .tru-opp { display: grid; gap: 6px; padding: 10px; border-radius: 12px; background: rgb(0 0 0 / 0.25); border: 2px solid transparent; }
 .tru-opp[aria-current="true"] { box-shadow: 0 0 0 3px var(--win); }
 .tru-hand { display: flex; flex-wrap: wrap; gap: 8px; min-height: 96px; align-items: center; }
-.tru-card { position: relative; display: inline-grid; place-items: center; flex: none; width: 62px; height: 92px; padding: 0; border-radius: 10px; border: 3px solid #fffdf6; background: #fbf6e8; color: var(--tru-suit, #333); font-family: inherit; font-weight: 900; box-shadow: 0 2px 6px rgb(0 0 0 / 0.45); }
-.tru-card__corner { position: absolute; top: 3px; left: 6px; font-size: 0.9rem; }
-.tru-card__symbol { font-size: 1.9rem; line-height: 1; }
-.tru-card__number { font-size: 1.3rem; line-height: 1; margin-top: -10px; }
+.tru-card { position: relative; display: inline-block; overflow: hidden; flex: none; width: 66px; height: 99px; padding: 0; border-radius: 10px; border: 2px solid #fffdf6; background: #fbf6e8; color: var(--tru-suit, #333); font-family: inherit; font-weight: 900; box-shadow: 0 2px 6px rgb(0 0 0 / 0.45); }
+.tru-card__svg { display: block; width: 100%; height: 100%; }
 .tru-card--back { background: repeating-linear-gradient(45deg, #7a1f2b, #7a1f2b 6px, #5a1520 6px, #5a1520 12px); }
 button.tru-card { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s; }
 button.tru-card:disabled { cursor: default; }
@@ -654,9 +652,7 @@ button.tru-card--playable:hover { transform: translateY(-14px); }
   .tru-mine.dock { display: flex; flex-wrap: wrap; align-items: center; }
   .tru-mine .bj-who { display: none; }
   .tru-mine .tru-hand { flex: 0 1 auto; }
-  .tru-mine .tru-card { width: 52px; height: 76px; }
-  .tru-mine .tru-card__symbol { font-size: 1.5rem; }
-  .tru-mine .tru-card__number { font-size: 1.05rem; margin-top: -8px; }
+  .tru-mine .tru-card { width: 52px; height: 78px; }
   .tru-mine .tru-envido { flex: 1 1 0; margin: 0; font-size: 0.82rem; line-height: 1.25; }
   .tru-mine .tru-envido .tru-none { display: block; }
   .tru-mine .tru-calls { flex: 1 1 100%; }
