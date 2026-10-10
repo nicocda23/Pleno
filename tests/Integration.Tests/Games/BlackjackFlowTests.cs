@@ -5,6 +5,7 @@ using Casino.Integration.Tests.Wallet;
 using Casino.Modules.Games.Application;
 using Casino.Modules.Games.Blackjack;
 using Casino.Modules.Games.Fairness;
+using Marten;
 using Casino.Modules.Wallet.Application;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -502,6 +503,51 @@ public sealed class BlackjackFlowTests(PostgresFixture db, RabbitMqFixture rabbi
         await WaitUntilAsync(async () => await BalanceAsync(cluster, accountId) == (1_000, 0), "las fichas devueltas");
         Assert.Equal("Aborted", (await client.GetFromJsonAsync<JsonElement>($"/games/blackjack/rounds/{opened.Id}")).GetProperty("phase").GetString());
         await WaitForBetAsync(client, betId, b => b.GetProperty("status").GetString() == "Settled", "la apuesta cerrada");
+    }
+
+    /// <summary>Una apuesta puesta en una mano que espera la primera apuesta (sin reloj), como si su reserva estuviera todavia en camino.</summary>
+    private static async Task<Guid> InsertBetAsync(CasinoCluster cluster, Guid roundId, Guid userId, Guid accountId, bool reserved)
+    {
+        var bet = new BlackjackBet { Id = Guid.NewGuid(), RoundId = roundId, TableId = Table, UserId = userId, AccountId = accountId, Stake = 100, Status = RoundStatus.Placed, Reserved = reserved, PlacedAt = DateTimeOffset.UtcNow };
+        await using var session = cluster.Games.Services.GetRequiredService<IDocumentStore>().LightweightSession();
+        session.Insert(bet);
+        await session.SaveChangesAsync();
+        return bet.Id;
+    }
+
+    [Fact]
+    public async Task A_reservation_that_arrives_after_the_hand_went_back_to_waiting_starts_the_betting_clock()
+    {
+        // Pasa con el sistema recien levantado: la primera reserva tarda mas que la ventana, la mano vuelve a esperar y la reserva llega despues.
+        using var cluster = Start();
+        var blackjack = cluster.Games.Services.GetRequiredService<BlackjackService>();
+        var (userId, accountId) = await FundedAsync(cluster, 1_000);
+        var round = await blackjack.OpenRoundAsync(Table);
+        var betId = await InsertBetAsync(cluster, round.Id, userId, accountId, reserved: false);
+
+        await blackjack.OnStakeReservedAsync(new Casino.Contracts.StakeReserved(betId, accountId, 100, Guid.NewGuid()));
+
+        var after = await blackjack.GetRoundAsync(round.Id);
+        Assert.NotNull(after.BettingEndsAt); // antes quedaba esperando para siempre con una apuesta adentro
+        Assert.True((await blackjack.GetBetAsync(betId)).Reserved);
+    }
+
+    [Fact]
+    public async Task A_waiting_hand_with_a_reserved_bet_but_no_clock_is_re_armed_and_one_without_bets_is_left_alone()
+    {
+        using var cluster = Start();
+        var blackjack = cluster.Games.Services.GetRequiredService<BlackjackService>();
+        var (userId, accountId) = await FundedAsync(cluster, 1_000);
+
+        var empty = await blackjack.OpenRoundAsync(Table);
+        Assert.False(await blackjack.RearmClockAsync(empty.Id)); // sin apuestas: sigue esperando, sin reloj
+        Assert.Null((await blackjack.GetRoundAsync(empty.Id)).BettingEndsAt);
+
+        var stuck = await blackjack.OpenRoundAsync("mesa-3");
+        await InsertBetAsync(cluster, stuck.Id, userId, accountId, reserved: true);
+        Assert.True(await blackjack.RearmClockAsync(stuck.Id));
+        Assert.NotNull((await blackjack.GetRoundAsync(stuck.Id)).BettingEndsAt);
+        Assert.False(await blackjack.RearmClockAsync(stuck.Id)); // ya tiene reloj
     }
 
     [Fact]

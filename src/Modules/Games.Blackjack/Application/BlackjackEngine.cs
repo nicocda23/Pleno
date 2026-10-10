@@ -13,6 +13,7 @@ namespace Casino.Modules.Games.Application;
 public sealed partial class BlackjackEngine(BlackjackService blackjack, TimeProvider clock, ILogger<BlackjackEngine> logger) : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
+    private const int RearmEveryPolls = 10;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -106,13 +107,19 @@ public sealed partial class BlackjackEngine(BlackjackService blackjack, TimeProv
 
     private async Task<BlackjackRound> WaitForBettingEndAsync(Guid roundId, CancellationToken ct)
     {
-        while (true)
+        for (var polls = 0; ; polls++)
         {
             var round = await blackjack.GetRoundAsync(roundId, ct);
             if (round.BettingEndsAt is { } endsAt)
             {
                 await DelayUntilAsync(endsAt, ct);
                 return round;
+            }
+
+            // Una vez por segundo: si hay una apuesta reservada pero el reloj no arranco (la reserva llego tarde), se arranca.
+            if (polls % RearmEveryPolls == RearmEveryPolls - 1)
+            {
+                await blackjack.RearmClockAsync(roundId, ct);
             }
 
             await Task.Delay(PollInterval, clock, ct);

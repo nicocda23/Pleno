@@ -85,6 +85,42 @@ public sealed partial class BlackjackService(
     }
 
     /// <summary>
+    /// Red de seguridad: una mano que espera la primera apuesta (sin reloj) pero ya tiene una apuesta reservada arranca la ventana. Pasa si la reserva llego tarde
+    /// (por ejemplo con el sistema recien levantado) y la mano ya habia vuelto a esperar. Devuelve si arranco el reloj.
+    /// </summary>
+    public async Task<bool> RearmClockAsync(Guid roundId, CancellationToken ct = default)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                await using var session = store.LightweightSession();
+                var round = await session.LoadAsync<BlackjackRound>(roundId, ct);
+                if (round is not { Phase: BlackjackPhase.Betting, BettingEndsAt: null })
+                {
+                    return false;
+                }
+
+                var reserved = await session.Query<BlackjackBet>().CountAsync(b => b.RoundId == roundId && b.Status == RoundStatus.Placed && b.Reserved, ct);
+                if (reserved == 0 || !round.StartBettingClock(clock.GetUtcNow(), options.BettingSeconds))
+                {
+                    return false;
+                }
+
+                session.Store(round);
+                await using var outboxSession = outbox.Enroll(session);
+                await BroadcastAsync(outboxSession, round, clock.GetUtcNow());
+                await session.SaveChangesAsync(ct);
+                return true;
+            }
+            catch (ConcurrencyException) when (attempt < ConflictRetries)
+            {
+                // Alguien toco la mano a la vez: se vuelve a leer.
+            }
+        }
+    }
+
+    /// <summary>
     /// Cierra las apuestas y reparte. Si nadie llego a reservar, la mano vuelve a esperar (devuelve null). Los jugadores se sientan en el orden en que apostaron;
     /// si hay mas que asientos, los que sobran recuperan lo apostado. Si el crupier tiene blackjack natural se muestra y la mano se resuelve sin turnos.
     /// </summary>
@@ -542,6 +578,8 @@ public sealed partial class BlackjackService(
         if (round is { Phase: BlackjackPhase.Betting } && (round.BettingEndsAt is null || now < round.BettingEndsAt))
         {
             bet.MarkReserved();
+            // Si la reserva llega despues de que la ventana ya se cerro sin nadie reservado (la mano volvio a esperar), esta apuesta es ahora la primera: arranca el reloj.
+            round.StartBettingClock(now, options.BettingSeconds);
             session.Store(bet);
             session.Store(round); // fija la version de la mano: si el motor reparte a la vez, esta reserva reintenta y se devuelve
             await session.SaveChangesAsync(ct);
