@@ -1,4 +1,5 @@
 using Casino.Modules.Games.Platform;
+using System.Runtime.CompilerServices;
 using Marten;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -12,6 +13,8 @@ namespace Casino.Modules.Games.Tables;
 /// </summary>
 public abstract class TableGameModule(ITableGame game) : IGameModule
 {
+    private static readonly ConditionalWeakTable<StoreOptions, object?> Configured = [];
+
     public GameInfo Info => game.Info;
 
     public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
@@ -43,6 +46,12 @@ public abstract class TableGameModule(ITableGame game) : IGameModule
     public void ConfigureStorage(StoreOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+
+        // Varios juegos de mesas comparten estos documentos: se configuran una sola vez (dos veces duplicaria los indices).
+        if (!Configured.TryAdd(options, null))
+        {
+            return;
+        }
 
         // Una jugada del jugador y una del motor (un bot, un turno vencido) sobre la misma mesa no pueden pisarse: la segunda falla, vuelve a leer y reintenta.
         options.Schema.For<PlayerTable>().Identity(t => t.Id).UseOptimisticConcurrency(true).Index(t => t.GameId).Index(t => t.Status).Index(t => t.CreatedAt);
