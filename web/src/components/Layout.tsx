@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { BACKOFFICE_ROLE, useMe } from "../api/hooks";
+import { BACKOFFICE_ROLE, isCashierRole, useMe } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime, type ConnectionState } from "../realtime/RealtimeProvider";
 import { useTheme } from "../theme/ThemeProvider";
@@ -17,7 +17,9 @@ export function Layout() {
   const { displayName, logout } = useAuth();
   const { connection } = useRealtime();
   const { theme, toggle } = useTheme();
-  const isAdmin = useMe().data?.roles.includes(BACKOFFICE_ROLE) ?? false;
+  const roles = useMe().data?.roles;
+  const isAdmin = roles?.includes(BACKOFFICE_ROLE) ?? false;
+  const isCashier = isCashierRole(roles);
 
   // En el celular la navegacion, el tema y el usuario viven en un menu desplegable para que la barra ocupe una sola fila fina.
   // Se guarda en que pagina se abrio: al navegar a otra, el menu queda cerrado solo.
@@ -73,6 +75,7 @@ export function Layout() {
             <NavLink to="/ruleta">Ruleta</NavLink>
             <NavLink to="/historial">Historial</NavLink>
             <NavLink to="/movimientos">Movimientos</NavLink>
+            {isCashier && <NavLink to="/cajero">Cajero</NavLink>}
             {isAdmin && <NavLink to="/admin">Admin</NavLink>}
           </nav>
 

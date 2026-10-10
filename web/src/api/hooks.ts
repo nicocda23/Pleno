@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./ApiProvider";
 import { ApiError } from "./client";
-import type { Account, CreateTableBody, TableCreated, TableRules, TableState, TableSummary, BlackjackBet, BlackjackTable, BlackjackTableState, CrashBet, CrashCashOut, CrashState, GameInfo, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
+import type { Account, CashierMe, CashierTransfer, HierarchyLevel, HierarchyNode, JurisdictionMember, CreateTableBody, TableCreated, TableRules, TableState, TableSummary, BlackjackBet, BlackjackTable, BlackjackTableState, CrashBet, CrashCashOut, CrashState, GameInfo, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
 
 export const queryKeys = {
   spinsAll: ["spins"] as const,
@@ -29,9 +29,18 @@ export const queryKeys = {
   slotsSettings: ["admin", "slots-settings"] as const,
   slotsSettingsHistory: ["admin", "slots-settings-history"] as const,
   adminAccount: (userId: string) => ["admin", "account", userId] as const,
+  hierarchy: ["admin", "hierarchy"] as const,
+  cashierMe: ["cashier", "me"] as const,
+  cashierMembers: ["cashier", "members"] as const,
+  cashierTransfers: ["cashier", "transfers"] as const,
 };
 
 export const BACKOFFICE_ROLE = "backoffice";
+export const CASHIER_ROLE = "cashier";
+export const HEAD_CASHIER_ROLE = "head_cashier";
+
+/** Quien tiene rol de cajero o de jefe de cajeros. */
+export const isCashierRole = (roles: readonly string[] | undefined): boolean => !!roles && (roles.includes(CASHIER_ROLE) || roles.includes(HEAD_CASHIER_ROLE));
 
 /** Datos del usuario autenticado. Llamarlo tambien da de alta al jugador la primera vez. */
 export function useMe() {
@@ -423,5 +432,59 @@ export function useTableAction<A = unknown>(gameId: string, tableId: string) {
   return useMutation({
     mutationFn: (action: A) => api.post<void>(`/games/${gameId}/tables/${tableId}/action`, action),
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.table(gameId, tableId) }),
+  });
+}
+
+// ---- Cajeros y jerarquia de cargas ----
+
+/** Mi lugar en la jerarquia. 404 si el backoffice todavia no me asigno uno. */
+export function useCashierMe(enabled: boolean) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.cashierMe, queryFn: () => api.get<CashierMe>("/cashier/me"), enabled, retry: false });
+}
+
+/** La gente de mi jurisdiccion directa, con su saldo. */
+export function useCashierMembers(enabled: boolean) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.cashierMembers, queryFn: () => api.get<JurisdictionMember[]>("/cashier/members"), enabled });
+}
+
+/** Mis ultimas cargas. */
+export function useCashierTransfers(enabled: boolean) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.cashierTransfers, queryFn: () => api.get<CashierTransfer[]>("/cashier/transfers?limit=20"), enabled });
+}
+
+/** Cargar fichas desde mi saldo a alguien de mi jurisdiccion. */
+export function useLoadChips() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ toUserId, amount, idempotencyKey }: { toUserId: string; amount: number; idempotencyKey: string }) =>
+      api.post<CreditResult>("/cashier/transfers", { toUserId, amount }, { "Idempotency-Key": idempotencyKey }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.cashierMembers }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.cashierTransfers }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.account }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.movements }),
+      ]),
+  });
+}
+
+/** El arbol completo de cargas (solo backoffice). */
+export function useHierarchy(enabled: boolean) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.hierarchy, queryFn: () => api.get<HierarchyNode[]>("/backoffice/wallet/hierarchy"), enabled });
+}
+
+/** Pone a alguien en el arbol con un nivel y un padre (solo backoffice). */
+export function useAssignHierarchy() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, level, parentUserId }: { userId: string; level: HierarchyLevel; parentUserId: string | null }) =>
+      api.put<HierarchyNode>(`/backoffice/wallet/hierarchy/${userId}`, { level, parentUserId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.hierarchy }),
   });
 }
