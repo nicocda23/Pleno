@@ -89,6 +89,18 @@ public static class TestAuth
         return client;
     }
 
+    /// <summary>Como <see cref="ClientFor"/> pero con el nombre de usuario que trae el token (preferred_username).</summary>
+    public static HttpClient NamedClientFor(this CasinoCluster app, Guid userId, string username, params string[] roles)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        var client = app.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            Token(userId, username, roles.Length == 0 ? [Casino.BuildingBlocks.Roles.Player] : roles));
+        return client;
+    }
+
     /// <summary>
     /// El sistema completo con Postgres (y RabbitMQ si se indica) reales y autenticacion de prueba: el host principal (gateway, usuarios,
     /// juegos, tiempo real) y el servicio de la Wallet, cada uno con su base de datos y hablando por RabbitMQ. Sin RabbitMQ no hay

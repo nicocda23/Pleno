@@ -316,6 +316,82 @@ public sealed class CashierFlowTests : IDisposable
         Assert.Equal(("ChipsTransferred", cashier, 75L), (entry.GetProperty("action").GetString(), entry.GetProperty("actorUserId").GetGuid(), entry.GetProperty("amount").GetInt64()));
     }
 
+    // ---- Nombres: el cajero distingue a su gente, y solo a su gente ----
+
+    [Fact]
+    public async Task A_cashier_sees_the_user_names_of_their_players_and_nobody_elses()
+    {
+        var (head, cashier, otherCashier, mine, theirs, outsider) = (await UserAsync(), await UserAsync(), await UserAsync(), await UserAsync(), await UserAsync(), await UserAsync());
+        using var backoffice = _app.ClientFor(Guid.NewGuid(), Roles.Backoffice);
+        await AssignAsync(backoffice, head, Roles.HeadCashier, null);
+        await AssignAsync(backoffice, cashier, Roles.Cashier, head);
+        await AssignAsync(backoffice, otherCashier, Roles.Cashier, head);
+        await AssignAsync(backoffice, mine, Roles.Player, cashier);
+        await AssignAsync(backoffice, theirs, Roles.Player, otherCashier);
+        // Cada uno usa la API (el front consulta /wallet/me todo el tiempo) y ahi el servicio aprende su nombre de usuario.
+        foreach (var (id, name) in new[] { (mine, "ana"), (theirs, "beto"), (outsider, "carla") })
+        {
+            using var client = _app.NamedClientFor(id, name);
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/wallet/me")).StatusCode);
+        }
+
+        using var cashierClient = _app.ClientFor(cashier, Roles.Player, Roles.Cashier);
+        var members = await cashierClient.GetFromJsonAsync<JsonElement>("/cashier/members");
+        var tree = await backoffice.GetFromJsonAsync<JsonElement>("/backoffice/wallet/hierarchy");
+
+        var member = Assert.Single(members.EnumerateArray());
+        Assert.Equal(("ana", mine), (member.GetProperty("displayName").GetString(), member.GetProperty("userId").GetGuid()));
+        Assert.DoesNotContain("beto", members.GetRawText()); // el jugador de otro cajero
+        Assert.DoesNotContain("carla", members.GetRawText());
+        // Quien no esta en el arbol no deja su nombre guardado (no se acumulan nombres de quien no los necesita).
+        Assert.DoesNotContain(tree.EnumerateArray(), n => n.GetProperty("userId").GetGuid() == outsider);
+        // El backoffice, que ve todo el arbol, tambien los ve.
+        Assert.Equal("beto", tree.EnumerateArray().Single(n => n.GetProperty("userId").GetGuid() == theirs).GetProperty("displayName").GetString());
+    }
+
+    [Fact]
+    public async Task A_loaded_player_keeps_showing_their_name_only_while_they_are_in_the_cashiers_jurisdiction()
+    {
+        var (head, cashier, otherCashier, player) = (await UserAsync(), await UserAsync(1_000), await UserAsync(), await UserAsync());
+        using var backoffice = _app.ClientFor(Guid.NewGuid(), Roles.Backoffice);
+        await AssignAsync(backoffice, head, Roles.HeadCashier, null);
+        await AssignAsync(backoffice, cashier, Roles.Cashier, head);
+        await AssignAsync(backoffice, otherCashier, Roles.Cashier, head);
+        await AssignAsync(backoffice, player, Roles.Player, cashier);
+        using (var playerClient = _app.NamedClientFor(player, "ana"))
+        {
+            await playerClient.GetAsync("/wallet/me");
+        }
+
+        using var cashierClient = _app.ClientFor(cashier, Roles.Player, Roles.Cashier);
+        await LoadAsync(cashierClient, player, 50, "n-1");
+        var before = await cashierClient.GetFromJsonAsync<JsonElement>("/cashier/transfers");
+        await AssignAsync(backoffice, player, Roles.Player, otherCashier); // lo mueven a otro cajero
+        var after = await cashierClient.GetFromJsonAsync<JsonElement>("/cashier/transfers");
+
+        Assert.Equal("ana", Assert.Single(before.EnumerateArray()).GetProperty("targetName").GetString());
+        Assert.Equal(JsonValueKind.Null, Assert.Single(after.EnumerateArray()).GetProperty("targetName").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_very_long_or_odd_user_name_is_cleaned_and_capped()
+    {
+        var (head, cashier, player) = (await UserAsync(), await UserAsync(), await UserAsync());
+        using var backoffice = _app.ClientFor(Guid.NewGuid(), Roles.Backoffice);
+        await AssignAsync(backoffice, head, Roles.HeadCashier, null);
+        await AssignAsync(backoffice, cashier, Roles.Cashier, head);
+        await AssignAsync(backoffice, player, Roles.Player, cashier);
+        using (var playerClient = _app.NamedClientFor(player, "  " + new string('x', 100) + "  "))
+        {
+            await playerClient.GetAsync("/wallet/me");
+        }
+
+        using var cashierClient = _app.ClientFor(cashier, Roles.Player, Roles.Cashier);
+        var members = await cashierClient.GetFromJsonAsync<JsonElement>("/cashier/members");
+
+        Assert.Equal(new string('x', 60), Assert.Single(members.EnumerateArray()).GetProperty("displayName").GetString());
+    }
+
     /// <summary>Un jefe de cajeros cualquiera, ya asignado (para los tests que solo necesitan un cajero valido).</summary>
     private async Task<Guid> HeadFor(HttpClient backoffice)
     {

@@ -4,6 +4,7 @@ using Casino.Modules.Wallet.Domain;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Casino.Modules.Wallet.Api;
 
@@ -11,9 +12,10 @@ public sealed record LoadChipsRequest(Guid ToUserId, long Amount);
 
 public sealed record CashierMeResponse(Guid UserId, string Level, Guid? ParentUserId);
 
-public sealed record JurisdictionMemberResponse(Guid UserId, string Level, long? Available, long? Reserved);
+public sealed record JurisdictionMemberResponse(Guid UserId, string Level, string? DisplayName, long? Available, long? Reserved);
 
-public sealed record CashierTransferResponse(Guid TargetUserId, long Amount, Guid TransactionId, DateTimeOffset OccurredAt);
+/// <summary><paramref name="TargetName"/> solo viene si el destinatario sigue siendo de mi jurisdiccion (no se filtran nombres de quien ya no esta a mi cargo).</summary>
+public sealed record CashierTransferResponse(Guid TargetUserId, string? TargetName, long Amount, Guid TransactionId, DateTimeOffset OccurredAt);
 
 /// <summary>
 /// Cajeros y jefes de cajeros. La identidad y el nivel salen del token (nunca del cuerpo): el jefe carga a sus cajeros y el cajero a sus jugadores, siempre desde
@@ -28,6 +30,7 @@ internal static class CashierEndpoints
         var group = app.MapGroup("/cashier").WithTags("Cashier");
         group.RequireAuthorization(policy => policy.RequireRole(Roles.Cashier, Roles.HeadCashier));
         group.AddEndpointFilter(WalletEndpoints.MapDomainErrors);
+        group.AddEndpointFilter(CaptureDisplayName);
 
         // Mi lugar en la jerarquia (null si el backoffice todavia no me asigno uno).
         group.MapGet("/me", async (HttpContext http, CashierService cashiers, CancellationToken ct) =>
@@ -43,7 +46,7 @@ internal static class CashierEndpoints
         group.MapGet("/members", async (HttpContext http, CashierService cashiers, int? limit, CancellationToken ct) =>
         {
             var members = await cashiers.ListMembersAsync(http.User.GetUserId(), Math.Clamp(limit ?? 100, 1, 500), ct);
-            return Results.Ok(members.Select(m => new JurisdictionMemberResponse(m.UserId, CashierService.NameOf(m.Level), m.Available, m.Reserved)));
+            return Results.Ok(members.Select(m => new JurisdictionMemberResponse(m.UserId, CashierService.NameOf(m.Level), m.DisplayName, m.Available, m.Reserved)));
         });
 
         // Cargar fichas desde mi saldo a alguien de mi jurisdiccion.
@@ -64,10 +67,25 @@ internal static class CashierEndpoints
         });
 
         // Mis ultimas cargas.
-        group.MapGet("/transfers", async (HttpContext http, BackofficeAudit audit, int? limit, CancellationToken ct) =>
+        group.MapGet("/transfers", async (HttpContext http, BackofficeAudit audit, CashierService cashiers, int? limit, CancellationToken ct) =>
         {
-            var entries = await audit.ListTransfersByActorAsync(http.User.GetUserId(), Math.Clamp(limit ?? 25, 1, 100), ct);
-            return Results.Ok(entries.Select(e => new CashierTransferResponse(e.TargetUserId, e.Amount, e.TransactionId, e.OccurredAt)));
+            var me = http.User.GetUserId();
+            var entries = await audit.ListTransfersByActorAsync(me, Math.Clamp(limit ?? 25, 1, 100), ct);
+            // Solo se muestran los nombres de quienes siguen a mi cargo.
+            var names = await cashiers.GetMemberNamesAsync(me, ct);
+            return Results.Ok(entries.Select(e => new CashierTransferResponse(e.TargetUserId, names.GetValueOrDefault(e.TargetUserId), e.Amount, e.TransactionId, e.OccurredAt)));
         });
+    }
+
+    /// <summary>Guarda el nombre de usuario del token de quien esta en el arbol (ver <see cref="HierarchyNode.DisplayName"/>). Se ejecuta antes de cada pedido autenticado; nunca lo rechaza.</summary>
+    internal static async ValueTask<object?> CaptureDisplayName(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+    {
+        var http = context.HttpContext;
+        if (http.User.Identity?.IsAuthenticated == true && http.User.TryGetUserId(out var userId))
+        {
+            await http.RequestServices.GetRequiredService<CashierService>().TouchDisplayNameAsync(userId, http.User.FindFirst("preferred_username")?.Value, http.RequestAborted);
+        }
+
+        return await next(context);
     }
 }

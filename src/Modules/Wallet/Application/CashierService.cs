@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Casino.BuildingBlocks;
 using Casino.Modules.Wallet.Domain;
 using Marten;
@@ -30,10 +31,16 @@ public sealed class HierarchyNode
     public DateTimeOffset UpdatedAt { get; set; }
 
     public Guid UpdatedBy { get; set; }
+
+    /// <summary>
+    /// El nombre de usuario (el "preferred_username" del token) para que quien tiene a esta persona a cargo pueda distinguirla. Solo se guarda de quienes estan en el arbol
+    /// y se renueva cuando la persona usa la API; nunca se muestra fuera de su jurisdiccion.
+    /// </summary>
+    public string? DisplayName { get; set; }
 }
 
 /// <summary>Un jugador (o cajero) de la jurisdiccion de alguien, con su saldo si ya tiene cuenta.</summary>
-public sealed record JurisdictionMember(Guid UserId, HierarchyLevel Level, long? Available, long? Reserved);
+public sealed record JurisdictionMember(Guid UserId, HierarchyLevel Level, string? DisplayName, long? Available, long? Reserved);
 
 /// <summary>
 /// Cajeros y jefes de cajeros: arman el arbol de jurisdicciones (lo decide el backoffice) y cargan fichas hacia abajo (jefe → cajero → jugador) desde su
@@ -41,6 +48,57 @@ public sealed record JurisdictionMember(Guid UserId, HierarchyLevel Level, long?
 /// </summary>
 public sealed class CashierService(IDocumentStore store, WalletService wallet, BackofficeAudit audit, TimeProvider clock)
 {
+    private const int MaxDisplayNameLength = 60;
+
+    // Ultimo nombre guardado de cada usuario (en esta instancia): evita ir a la base en cada pedido cuando el nombre no cambio.
+    private readonly ConcurrentDictionary<Guid, string> _knownNames = new();
+
+    /// <summary>
+    /// Guarda el nombre de usuario de quien esta en el arbol (si no esta, no guarda nada: no se acumulan nombres de quien no los necesita). Nunca falla el pedido que lo dispara.
+    /// </summary>
+    public async Task TouchDisplayNameAsync(Guid userId, string? rawName, CancellationToken ct = default)
+    {
+        var name = CleanName(rawName);
+        if (name is null || (_knownNames.TryGetValue(userId, out var known) && known == name))
+        {
+            return;
+        }
+
+        try
+        {
+            await using var session = store.LightweightSession();
+            var node = await session.LoadAsync<HierarchyNode>(userId, ct);
+            if (node is null)
+            {
+                return; // no esta en el arbol todavia: se guardara cuando lo ubiquen y vuelva a usar la API
+            }
+
+            if (node.DisplayName != name)
+            {
+                node.DisplayName = name;
+                session.Store(node);
+                await session.SaveChangesAsync(ct);
+            }
+
+            _knownNames[userId] = name;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Mejora de visualizacion: si falla, se reintenta en el proximo pedido.
+        }
+    }
+
+    private static string? CleanName(string? rawName)
+    {
+        if (string.IsNullOrWhiteSpace(rawName))
+        {
+            return null;
+        }
+
+        var name = new string([.. rawName.Trim().Where(c => !char.IsControl(c))]);
+        return name.Length == 0 ? null : name[..Math.Min(name.Length, MaxDisplayNameLength)];
+    }
+
     /// <summary>El nivel que da un conjunto de roles del token (el mas alto manda). Null si no es cajero ni jefe.</summary>
     public static HierarchyLevel? LevelOfRoles(IEnumerable<string> roles)
     {
@@ -141,6 +199,14 @@ public sealed class CashierService(IDocumentStore store, WalletService wallet, B
 
     // ---- Cajero / jefe ----
 
+    /// <summary>Los nombres de la gente a cargo directo de <paramref name="parentUserId"/> (solo de ellos, nunca de otros).</summary>
+    public async Task<IReadOnlyDictionary<Guid, string?>> GetMemberNamesAsync(Guid parentUserId, CancellationToken ct = default)
+    {
+        await using var session = store.QuerySession();
+        var nodes = await session.Query<HierarchyNode>().Where(n => n.ParentUserId == parentUserId).ToListAsync(ct);
+        return nodes.ToDictionary(n => n.Id, n => n.DisplayName);
+    }
+
     /// <summary>La gente a cargo directo de <paramref name="parentUserId"/>, con su saldo.</summary>
     public async Task<IReadOnlyList<JurisdictionMember>> ListMembersAsync(Guid parentUserId, int limit, CancellationToken ct = default)
     {
@@ -152,11 +218,11 @@ public sealed class CashierService(IDocumentStore store, WalletService wallet, B
             try
             {
                 var account = await wallet.GetAsync(PlayerIds.WalletAccountFor(node.Id), ct);
-                members.Add(new JurisdictionMember(node.Id, node.Level, account.Available, account.Reserved));
+                members.Add(new JurisdictionMember(node.Id, node.Level, node.DisplayName, account.Available, account.Reserved));
             }
             catch (WalletDomainException ex) when (ex.Error == WalletError.AccountNotFound)
             {
-                members.Add(new JurisdictionMember(node.Id, node.Level, null, null)); // todavia no abrio su cuenta
+                members.Add(new JurisdictionMember(node.Id, node.Level, node.DisplayName, null, null)); // todavia no abrio su cuenta
             }
         }
 

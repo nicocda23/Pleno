@@ -11,7 +11,7 @@ public sealed record CreditRequest(long Amount);
 
 public sealed record HierarchyAssignRequest(string? Level, Guid? ParentUserId);
 
-public sealed record HierarchyNodeResponse(Guid UserId, string Level, Guid? ParentUserId, DateTimeOffset UpdatedAt);
+public sealed record HierarchyNodeResponse(Guid UserId, string Level, string? DisplayName, Guid? ParentUserId, DateTimeOffset UpdatedAt);
 
 public sealed record AuditEntryResponse(
     string Action, Guid ActorUserId, Guid TargetUserId, long Amount, Guid TransactionId, DateTimeOffset OccurredAt);
@@ -41,6 +41,8 @@ internal static class WalletEndpoints
         var player = app.MapGroup("/wallet").WithTags("Wallet");
         player.RequireAuthorization(policy => policy.RequireRole(Roles.Player));
         player.AddEndpointFilter(MapDomainErrors);
+        // El front consulta /wallet/me todo el tiempo: asi el nombre de quien esta en el arbol se mantiene al dia sin pedidos extra.
+        player.AddEndpointFilter(CashierEndpoints.CaptureDisplayName);
 
         // La cuenta se deriva del usuario autenticado: no hay forma de pedir la de otro.
         player.MapGet("/me", (HttpContext http, WalletService wallet, CancellationToken ct) =>
@@ -99,7 +101,7 @@ internal static class WalletEndpoints
 
         // Jerarquia de cargas: quien es jefe de cajeros, cajero o jugador y de quien depende. Los roles de Keycloak dan acceso; el arbol dice a quien se le puede cargar.
         backoffice.MapGet("/hierarchy", async (CashierService cashiers, CancellationToken ct) =>
-            Results.Ok((await cashiers.ListAllAsync(ct)).Select(n => new HierarchyNodeResponse(n.Id, CashierService.NameOf(n.Level), n.ParentUserId, n.UpdatedAt))));
+            Results.Ok((await cashiers.ListAllAsync(ct)).Select(n => new HierarchyNodeResponse(n.Id, CashierService.NameOf(n.Level), n.DisplayName, n.ParentUserId, n.UpdatedAt))));
 
         backoffice.MapPut("/hierarchy/{userId:guid}", async (Guid userId, HierarchyAssignRequest body, HttpContext context, CashierService cashiers, CancellationToken ct) =>
         {
@@ -112,7 +114,7 @@ internal static class WalletEndpoints
             }
 
             var node = await cashiers.AssignAsync(context.User.GetUserId(), userId, level, body.ParentUserId, ct);
-            return Results.Ok(new HierarchyNodeResponse(node.Id, CashierService.NameOf(node.Level), node.ParentUserId, node.UpdatedAt));
+            return Results.Ok(new HierarchyNodeResponse(node.Id, CashierService.NameOf(node.Level), node.DisplayName, node.ParentUserId, node.UpdatedAt));
         });
 
         // Registro de auditoria: quien cargo fichas, a quien y cuando.
