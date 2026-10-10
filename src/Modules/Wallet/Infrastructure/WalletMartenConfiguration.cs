@@ -28,6 +28,7 @@ public static class WalletMartenConfiguration
             typeof(AccountOpened),
             typeof(ChipsCredited),
             typeof(ChipsTransferred),
+            typeof(ReservationPaidOut),
             typeof(BetReserved),
             typeof(BetSettled),
             typeof(ReservationReleased),
