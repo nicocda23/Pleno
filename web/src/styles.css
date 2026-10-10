@@ -601,16 +601,24 @@ button.tru-card:disabled { cursor: default; }
 .tru-card--playable { transform: translateY(-8px); box-shadow: 0 0 0 3px var(--gold), 0 6px 14px rgb(0 0 0 / 0.5); }
 button.tru-card--playable:hover { transform: translateY(-14px); }
 .tru-card--dim { opacity: 0.55; }
-.tru-table { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; min-height: 140px; align-items: center; padding: 10px; border-radius: 12px; background: rgb(0 0 0 / 0.18); }
-.tru-baza { display: grid; gap: 6px; justify-items: center; }
-.tru-baza__title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
-.tru-baza__cards { display: flex; gap: 6px; }
-.tru-played { display: grid; gap: 2px; justify-items: center; }
-.tru-played__who { font-size: 0.75rem; color: #d6ceb8; }
-.tru-baza__result { font-size: 0.85rem; font-weight: 800; color: #d6ceb8; }
-.tru-baza__result--won { color: #8ff0bf; }
-.tru-baza__result--lost { color: #ff9c9c; }
-.tru-baza__result--tie { color: #f2c230; }
+.tru-table { display: grid; gap: 8px; justify-items: center; padding: 10px; border-radius: 12px; background: rgb(0 0 0 / 0.18); }
+.tru-pile { position: relative; width: min(100%, 280px); height: 230px; }
+.tru-pile__card {
+  position: absolute; left: 50%; top: 50%; filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.45));
+  transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) rotate(var(--rot, 0deg));
+  animation: tru-drop 0.32s ease-out;
+}
+@keyframes tru-drop {
+  from { opacity: 0; transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px) - 40px)) rotate(var(--rot, 0deg)) scale(1.14); }
+  to { opacity: 1; transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) rotate(var(--rot, 0deg)); }
+}
+.tru-pile .tru-none { position: absolute; inset: 0; display: grid; place-items: center; }
+.tru-recap { margin: 0; font-weight: 800; color: #f2c230; text-align: center; }
+.tru-manos { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; }
+.tru-manos li { font-size: 0.85rem; font-weight: 800; color: #d6ceb8; }
+.tru-mano--won { color: #8ff0bf !important; }
+.tru-mano--lost { color: #ff9c9c !important; }
+.tru-mano--tie { color: #f2c230 !important; }
 .tru-pending { padding: 10px 14px; border-radius: 10px; font-weight: 800; text-align: center; background: color-mix(in srgb, var(--gold) 25%, transparent); border: 1px solid var(--gold); }
 .tru-mine { display: grid; gap: 10px; }
 .tru-envido { font-weight: 700; }
@@ -704,4 +712,9 @@ button.tru-card--playable:hover { transform: translateY(-14px); }
   .game--open .game__cta { display: none; }
   .game--soon .game__cta { grid-column: 1 / -1; margin-top: 0; font-size: 0.8rem; }
   .hero .display { font-size: 1.4rem; }
+
+  /* Truco: la pila de cartas jugadas mas baja (la carta de la mesa es mas chica en el celular). */
+  .tru-pile { height: 196px; }
+  .tru-table { padding: 6px; gap: 4px; }
 }
+

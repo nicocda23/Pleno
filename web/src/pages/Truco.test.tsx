@@ -53,7 +53,7 @@ describe("Truco", () => {
     expect(await screen.findByTestId("tru-score-me")).toHaveTextContent("4");
     expect(screen.getByTestId("tru-score-rival")).toHaveTextContent("2");
     expect(screen.getByTestId("tru-score")).toHaveTextContent("a 15");
-    expect(screen.getByTestId("tru-score")).toHaveTextContent("Vos · mano");
+    expect(screen.getByTestId("tru-score")).toHaveTextContent("Vos · es mano");
     expect(screen.getByTestId("tru-info")).toHaveTextContent("sin truco · vale 1 punto");
     expect(screen.getByTestId("tru-status")).toHaveTextContent(/Es tu turno: jugá una carta o cantá \(\d+ s\)/);
     expect(screen.getByRole("img", { name: "Bot 2 tiene 3 cartas" })).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe("Truco", () => {
     const pending = { kind: "truco" as const, caller: 0, level: 1, calls: [] };
     renderApp(<Truco />, { api: apiWith({ table: view({ turnSeat: 1, game: game({ current: 1, actions: [], pending }) }) }) });
 
-    expect(await screen.findByTestId("tru-status")).toHaveTextContent("Juega Bot 2");
+    expect(await screen.findByTestId("tru-status")).toHaveTextContent("Bot 2 está pensando…");
     expect(screen.getByTestId("tru-pending")).toHaveTextContent("Jugador 1 cantó truco: ¿quiero? Esperando la respuesta.");
     const hand = screen.getByTestId("tru-hand");
     for (const card of within(hand).getAllByRole("button")) {
@@ -120,20 +120,43 @@ describe("Truco", () => {
     expect(screen.getByTestId("tru-opp")).toHaveAttribute("aria-current", "true");
   });
 
-  it("groups the played cards by baza with their result, and shows the accepted truco level", async () => {
+  it("lays the played cards in ONE pile (each mano on top of the previous one), lists the result of every mano and shows the accepted truco level", async () => {
     const g = game({
       hand: [39], table: [{ seat: 0, card: 0 }, { seat: 1, card: 2 }, { seat: 1, card: 3 }, { seat: 0, card: 13 }, { seat: 0, card: 21 }], bazas: [0, -1], trucoLevel: 2, opponentCards: 0, actions: [],
     });
     renderApp(<Truco />, { api: apiWith({ table: view({ game: g }) }) });
 
-    const bazas = await screen.findAllByTestId("tru-baza");
-    expect(bazas).toHaveLength(3);
-    expect(bazas[0]).toHaveTextContent("Ganaste la baza");
-    expect(bazas[1]).toHaveTextContent("Parda");
-    expect(bazas[2]).toHaveTextContent("En juego");
-    expect(within(bazas[0]!).getByRole("img", { name: "Jugaste 1 de espadas" })).toBeInTheDocument();
-    expect(within(bazas[0]!).getByRole("img", { name: "Bot 2 jugó 3 de espadas" })).toBeInTheDocument();
+    const pile = await screen.findByTestId("tru-pile");
+    const layers = [...pile.querySelectorAll<HTMLElement>(".tru-pile__card")];
+    expect(layers.map((l) => l.dataset.mano)).toEqual(["1", "1", "2", "2", "3"]); // cada carta sabe a que mano pertenece
+    expect(layers.map((l) => Number(l.style.zIndex))).toEqual([1, 2, 3, 4, 5]); // y la mano nueva queda ENCIMA de la anterior
+    expect(within(pile).getByRole("img", { name: "Jugaste 1 de espadas" })).toBeInTheDocument();
+    expect(within(pile).getByRole("img", { name: "Bot 2 jugó 3 de espadas" })).toBeInTheDocument();
+    const manos = screen.getAllByTestId("tru-mano");
+    expect(manos.map((m) => m.textContent)).toEqual(["Primera mano: ganaste", "Segunda mano: parda", "Tercera mano: en juego"]);
     expect(screen.getByTestId("tru-info")).toHaveTextContent("Retruco aceptado · vale 3 puntos");
+    expect(document.body.textContent).not.toMatch(/baza/i); // en el Truco se dice "mano"
+  });
+
+  it("keeps the cards of the round that just ended on the table for a few seconds, with who won it", async () => {
+    const played = [{ seat: 0, card: 0 }, { seat: 1, card: 2 }, { seat: 0, card: 13 }, { seat: 1, card: 3 }];
+    const scenario: Scenario = { table: view({ game: game({ handNo: 3, table: played, bazas: [0, 1], actions: [], current: 1 }) }) };
+    renderApp(<Truco />, { api: apiWith(scenario) });
+    expect(await within(await screen.findByTestId("tru-pile")).findAllByRole("img")).toHaveLength(4);
+
+    // El servidor reparte la ronda siguiente de inmediato (mesa vacia): las cartas de la anterior siguen a la vista un rato.
+    scenario.table = view({ game: game({ handNo: 4, table: [], bazas: [], events: [{ seat: 1, kind: "hand_end", card: null, value: 2, a: null, b: null }] }) });
+
+    const recap = await screen.findByTestId("tru-recap", {}, { timeout: 4_000 });
+    expect(recap).toHaveTextContent("Ronda 3: ganó Bot 2 +2");
+    expect(within(screen.getByTestId("tru-pile")).getAllByRole("img")).toHaveLength(4);
+    expect(screen.getByTestId("tru-info")).toHaveTextContent("Ronda 4");
+  });
+
+  it("says the bot is thinking while it is its turn", async () => {
+    renderApp(<Truco />, { api: apiWith({ table: view({ turnSeat: 1, game: game({ current: 1, actions: [] }) }) }) });
+
+    expect(await screen.findByTestId("tru-status")).toHaveTextContent("Bot 2 está pensando…");
   });
 
   it("shows the recent events in Spanish, newest first", async () => {

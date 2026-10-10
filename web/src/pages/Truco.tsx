@@ -1,14 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type CSSProperties } from "react";
 import { queryKeys, useTableAction } from "../api/hooks";
-import type { TrucoAction, TrucoActionType, TrucoView } from "../api/types";
+import type { TrucoAction, TrucoActionType, TrucoPlay, TrucoView } from "../api/types";
 import { Confetti } from "../components/Confetti";
 import { SpanishCardFace } from "../components/SpanishCard";
 import { TablesLobby, type LiveTable } from "../components/TablesLobby";
 import { sha256Hex } from "../lib/crash";
 import { formatChips } from "../lib/format";
 import { detailedErrorMessage } from "../lib/messages";
-import { SUIT_CSS, actionLabel, byStrength, decodeCard, eventText, groupOf, GROUP_LABELS, pendingText, playBody, trucoLevelName, trucoWorth, type ActionGroup } from "../lib/truco";
+import { MANO_NAMES, SUIT_CSS, actionLabel, byStrength, decodeCard, eventText, groupOf, GROUP_LABELS, pendingText, pileSpot, playBody, trucoLevelName, trucoWorth, type ActionGroup } from "../lib/truco";
 import { playWinSound } from "../lib/winSound";
 
 const GAME_ID = "truco";
@@ -33,9 +33,9 @@ function Rules() {
     <section className="card" aria-labelledby="tru-reglas">
       <h2 id="tru-reglas" className="section-title">Reglas</h2>
       <ul className="tru-rules">
-        <li>Baraja española de 40 cartas, sin flor. Cada ronda se reparten 3 cartas y se juegan hasta 3 bazas: gana la ronda quien gana 2 (la mano desempata una parda).</li>
+        <li>Baraja española de 40 cartas, sin flor. Cada ronda se reparten 3 cartas y se juegan hasta 3 manos: gana la ronda quien gana 2 (si hay parda desempata quien es mano, el que empieza la ronda).</li>
         <li>De mayor a menor: 1 de espadas, 1 de bastos, 7 de espadas, 7 de oros, los 3, los 2, los 1 de copas y oros, 12, 11, 10, los 7 de copas y bastos, 6, 5 y 4.</li>
-        <li>Envido, en la primera baza: se cuentan 20 más las dos mejores cartas del mismo palo (las figuras valen 0); sin dos del mismo palo, vale la carta más alta. Se puede subir con real envido y falta envido.</li>
+        <li>Envido, en la primera mano: se cuentan 20 más las dos mejores cartas del mismo palo (las figuras valen 0); sin dos del mismo palo, vale la carta más alta. Se puede subir con real envido y falta envido.</li>
         <li>Truco: vale 2 puntos la ronda; se sube con retruco (3) y vale cuatro (4). Si no querés, el otro suma los puntos que valía antes del canto.</li>
         <li>"Al mazo" abandona la ronda y el otro se lleva los puntos que estén en juego.</li>
         <li>Gana quien llega a 15 puntos y se lleva la suma de las entradas.</li>
@@ -68,6 +68,9 @@ function TrucoCard({ card, label, onClick, disabled, playable, dimmed }: { card:
 const secondsUntil = (iso: string | null, serverNowMs: number): number => (iso === null ? 0 : Math.max(0, Math.ceil((Date.parse(iso) - serverNowMs) / 1000)));
 
 type Verification = { ok: boolean } | null;
+/** La ronda que acaba de terminar: sus cartas y el resultado de cada mano. */
+type Recap = { handNo: number; table: TrucoPlay[]; manos: number[] };
+const RECAP_MS = 3_500;
 type CallType = Exclude<TrucoActionType, "play">;
 const GROUPS: ActionGroup[] = ["envido", "truco", "response"];
 /** El servidor ordena las jugadas alfabeticamente: en pantalla van de menor a mayor canto y "Quiero" antes que "No quiero". */
@@ -83,10 +86,23 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
   const [winClosed, setWinClosed] = useState(false);
   const [verification, setVerification] = useState<Verification>(null);
 
+  // Al terminar una ronda el servidor reparte la siguiente de inmediato: se guardan las cartas de la que acaba de terminar para dejarlas a la vista unos segundos.
+  const [seen, setSeen] = useState<TrucoView | null>(null);
+  const [recap, setRecap] = useState<Recap | null>(null);
+  if (game && (seen === null || seen.handNo !== game.handNo || seen.table.length !== game.table.length)) {
+    if (seen !== null && game.handNo > seen.handNo && seen.table.length > 0) setRecap({ handNo: seen.handNo, table: seen.table, manos: seen.bazas });
+    setSeen(game);
+  }
+
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(id);
   }, []);
+  useEffect(() => {
+    if (!recap) return;
+    const id = window.setTimeout(() => setRecap(null), RECAP_MS);
+    return () => window.clearTimeout(id);
+  }, [recap]);
 
   const finished = table.status === "Finished";
   const mySeat = table.mySeat;
@@ -126,10 +142,17 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
     act.mutate(action, { onError: (e) => setError(detailedErrorMessage(e)) });
   };
 
-  // Las cartas de la mesa, agrupadas por baza (de a dos jugadas) con el resultado de cada una.
-  const bazaGroups = Array.from({ length: Math.ceil(game.table.length / 2) }, (_, i) => ({ plays: game.table.slice(i * 2, i * 2 + 2), result: game.bazas[i] }));
-  const bazaResult = (result: number | undefined): string =>
-    result === undefined ? "En juego" : result === -1 ? "Parda" : mySeat === null ? `Ganó ${nameOf(result)}` : result === mySeat ? "Ganaste la baza" : "Perdiste la baza";
+  // Las cartas de la mesa van en UNA pila (la segunda mano se juega encima de la primera). Si acaba de terminar una ronda, se ve esa ronda unos segundos.
+  const showingRecap = recap !== null && game.table.length === 0;
+  const pile = showingRecap ? recap.table : game.table;
+  const manos = showingRecap ? recap.manos : game.bazas;
+  const manoCount = Math.max(Math.ceil(pile.length / 2), manos.length);
+  const manoResult = (result: number | undefined): string =>
+    result === undefined ? "en juego" : result === -1 ? "parda" : mySeat === null ? `ganó ${nameOf(result)}` : result === mySeat ? "ganaste" : "perdiste";
+  const lastEnd = [...game.events].reverse().find((e) => e.kind === "hand_end");
+  const recapText = showingRecap && lastEnd
+    ? `Ronda ${recap.handNo}: ${mySeat !== null && lastEnd.seat === mySeat ? "ganaste" : `ganó ${nameOf(lastEnd.seat)}`}${lastEnd.value === null ? "" : ` +${lastEnd.value}`}`
+    : null;
 
   const pendingByRival = game.pending !== null && game.pending.caller !== mySeat;
   const worth = trucoWorth(game.trucoLevel);
@@ -137,6 +160,7 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
   const statusLabel = finished ? (winner < 0 ? "La partida terminó sin ganador" : winner === mySeat ? "¡Ganaste!" : `Ganó ${nameOf(winner)}`)
     : mySeat === null ? `Mirando la partida: juega ${nameOf(game.current)}`
     : myTurn ? (game.pending !== null ? `Te cantaron: respondé (${turnSeconds} s)` : `Es tu turno: jugá una carta o cantá (${turnSeconds} s)`)
+    : table.seats.find((s) => s.seat === game.current)?.isBot ? `${nameOf(game.current)} está pensando…`
     : `Juega ${nameOf(game.current)}${table.seats.find((s) => s.seat === game.current)?.away ? " (ausente: lo juega un bot)" : ""}`;
 
   const proof = async () => {
@@ -156,12 +180,12 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
         <div className="tru-felt">
           <div className="tru-score" data-testid="tru-score" role="group" aria-label={`Marcador, a ${game.target} puntos`}>
             <p className={`tru-score__side ${playing && game.current === me ? "tru-score__side--active" : ""}`}>
-              <span className="tru-score__name">{mySeat === null ? nameOf(me) : "Vos"}{game.mano === me ? " · mano" : ""}</span>
+              <span className="tru-score__name">{mySeat === null ? nameOf(me) : "Vos"}{game.mano === me ? " · es mano" : ""}</span>
               <strong className="tru-score__points" data-testid="tru-score-me">{game.scores[me] ?? 0}</strong>
             </p>
             <p className="muted tru-score__target">a {game.target}</p>
             <p className={`tru-score__side ${playing && game.current === rival ? "tru-score__side--active" : ""}`}>
-              <span className="tru-score__name">{nameOf(rival)}{game.mano === rival ? " · mano" : ""}</span>
+              <span className="tru-score__name">{nameOf(rival)}{game.mano === rival ? " · es mano" : ""}</span>
               <strong className="tru-score__points" data-testid="tru-score-rival">{game.scores[rival] ?? 0}</strong>
             </p>
           </div>
@@ -185,21 +209,26 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
           </div>
 
           <div className="tru-table" data-testid="tru-table" role="group" aria-label="Cartas jugadas en esta ronda">
-            {bazaGroups.map((group, i) => (
-              <div key={i} className="tru-baza" data-testid="tru-baza">
-                <p className="tru-baza__title">Baza {i + 1}</p>
-                <div className="tru-baza__cards">
-                  {group.plays.map((play) => (
-                    <div key={`${play.seat}-${play.card}`} className="tru-played">
-                      <TrucoCard card={play.card} label={`${play.seat === mySeat ? "Jugaste" : `${nameOf(play.seat)} jugó`} ${decodeCard(play.card).label}`} />
-                      <span className="tru-played__who">{play.seat === mySeat ? "Vos" : nameOf(play.seat)}</span>
-                    </div>
-                  ))}
-                </div>
-                <p className={`tru-baza__result ${group.result === undefined ? "" : group.result === -1 ? "tru-baza__result--tie" : group.result === mySeat ? "tru-baza__result--won" : "tru-baza__result--lost"}`}>{bazaResult(group.result)}</p>
-              </div>
-            ))}
-            {bazaGroups.length === 0 && <p className="tru-none">Todavía no se jugó ninguna carta.</p>}
+            {recapText && <p className="tru-recap" role="status" data-testid="tru-recap">{recapText}</p>}
+            <div className="tru-pile" data-testid="tru-pile">
+              {pile.map((play, i) => {
+                const spot = pileSpot(i, play.seat === me);
+                const style = { "--dx": `${spot.dx}px`, "--dy": `${spot.dy}px`, "--rot": `${spot.rot}deg`, zIndex: i + 1 } as CSSProperties;
+                return (
+                  <div key={`${showingRecap ? "r" : "p"}${i}`} className="tru-pile__card" data-mano={Math.floor(i / 2) + 1} style={style}>
+                    <TrucoCard card={play.card} label={`${play.seat === mySeat ? "Jugaste" : `${nameOf(play.seat)} jugó`} ${decodeCard(play.card).label}`} />
+                  </div>
+                );
+              })}
+              {pile.length === 0 && <p className="tru-none">Todavía no se jugó ninguna carta.</p>}
+            </div>
+            <ol className="tru-manos" aria-label="Resultado de cada mano" data-testid="tru-manos">
+              {Array.from({ length: manoCount }, (_, i) => (
+                <li key={i} data-testid="tru-mano" className={manos[i] === undefined ? "" : manos[i] === -1 ? "tru-mano--tie" : manos[i] === mySeat ? "tru-mano--won" : "tru-mano--lost"}>
+                  {MANO_NAMES[i] ?? `Mano ${i + 1}`}: {manoResult(manos[i])}
+                </li>
+              ))}
+            </ol>
           </div>
 
           {playing && game.pending !== null && (
@@ -212,10 +241,10 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
           {mySeat !== null && (
             <div className="tru-mine dock">
               <p className="bj-who">
-                Tu mano ({hand.length} {hand.length === 1 ? "carta" : "cartas"})
+                Tus cartas ({hand.length})
                 {myTurn ? ` · tu turno (${turnSeconds} s)` : ""}
               </p>
-              <div className="tru-hand" data-testid="tru-hand" role="group" aria-label="Tu mano">
+              <div className="tru-hand" data-testid="tru-hand" role="group" aria-label="Tus cartas">
                 {hand.map((card) => (
                   <TrucoCard
                     key={card}

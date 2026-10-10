@@ -1,5 +1,5 @@
 import type { TrucoEvent } from "../api/types";
-import { actionLabel, byStrength, decodeCard, eventText, groupOf, pendingText, playBody, strengthOf, trucoWorth } from "./truco";
+import { MANO_NAMES, actionLabel, byStrength, decodeCard, eventText, groupOf, pendingText, pileSpot, playBody, strengthOf, trucoWorth } from "./truco";
 
 const nameOf = (seat: number) => (seat === 0 ? "Jugador 1" : "Bot 2");
 const ev = (e: Partial<TrucoEvent> & Pick<TrucoEvent, "seat" | "kind">): TrucoEvent => ({ card: null, value: null, a: null, b: null, ...e });
@@ -33,8 +33,8 @@ describe("truco event texts", () => {
     expect(eventText(ev({ seat: 0, kind: "start" }), nameOf)).toBe("Empezó la ronda");
   });
 
-  it("tells bazas, envido results and the end of a hand", () => {
-    expect(eventText(ev({ seat: 0, kind: "baza" }), nameOf)).toBe("Ganó la baza Jugador 1");
+  it("tells manos, envido results and the end of a round", () => {
+    expect(eventText(ev({ seat: 0, kind: "baza" }), nameOf)).toBe("Ganó la mano Jugador 1"); // el servidor la llama "baza"; en pantalla es "mano"
     expect(eventText(ev({ seat: -1, kind: "parda" }), nameOf)).toBe("Parda");
     expect(eventText(ev({ seat: 0, kind: "envido_result", value: 2, a: 33, b: 27 }), nameOf)).toBe("Envido: Jugador 1 tenía 33 y Bot 2 27 — ganó Jugador 1 (+2)");
     expect(eventText(ev({ seat: 1, kind: "hand_end", value: 2 }), nameOf)).toBe("Ronda para Bot 2: +2");
@@ -68,5 +68,36 @@ describe("truco actions", () => {
     expect(pendingText({ kind: "envido", caller: 0, level: 0, calls: ["envido", "real_envido"] }, nameOf)).toBe("Jugador 1 cantó envido, real envido: ¿quiero?");
     expect(playBody(7)).toEqual({ type: "play", card: 7 });
     expect([0, 1, 2, 3].map(trucoWorth)).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe("la pila de cartas de la mesa", () => {
+  it("names the three manos of a round", () => {
+    expect(MANO_NAMES).toEqual(["Primera mano", "Segunda mano", "Tercera mano"]);
+  });
+
+  it("puts my card below and the rival's above, and moves each mano a bit further so the one played on top still shows the ones below", () => {
+    for (const mano of [0, 1, 2]) {
+      const rival = pileSpot(mano * 2, false);
+      const mine = pileSpot(mano * 2 + 1, true);
+
+      expect(mine.dy).toBeGreaterThan(rival.dy);
+    }
+
+    const firstMano = pileSpot(0, true);
+    const secondMano = pileSpot(2, true);
+    const thirdMano = pileSpot(4, true);
+
+    expect(secondMano.dx - firstMano.dx).toBeGreaterThan(20); // la segunda cae corrida de la primera: se ven asomar las de abajo
+    expect(thirdMano.dy).toBeGreaterThan(secondMano.dy);
+    expect(Math.abs(secondMano.dx - firstMano.dx)).toBeLessThan(66); // pero se juega ENCIMA: sigue tapando buena parte de la anterior (la carta mide 66 px)
+  });
+
+  it("throws the cards a little crooked, differently each one, and is deterministic", () => {
+    const rotations = [0, 1, 2, 3, 4, 5].map((i) => pileSpot(i, i % 2 === 1).rot);
+
+    expect(new Set(rotations).size).toBeGreaterThan(3);
+    expect(rotations.every((r) => Math.abs(r) <= 12)).toBe(true);
+    expect(pileSpot(3, true)).toEqual(pileSpot(3, true));
   });
 });

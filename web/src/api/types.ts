@@ -567,12 +567,19 @@ export interface TrucoPending {
 }
 
 /** Lo que ve mi asiento: mis cartas y mi envido, la mesa de esta ronda, el marcador, el canto pendiente y las jugadas legales ahora. */
+/** Una carta jugada en la mesa y quien la jugo. */
+export interface TrucoPlay {
+  seat: number;
+  card: number;
+}
+
 export interface TrucoView {
   you: number | null;
   hand: number[];
   envidoPoints: number | null;
   opponentCards: number;
-  table: { seat: number; card: number }[];
+  table: TrucoPlay[];
+  /** Quien gano cada mano de la ronda (el asiento, o -1 si fue parda). El nombre viene del servidor (`bazas`). */
   bazas: number[];
   scores: number[];
   target: number;
