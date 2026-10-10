@@ -58,6 +58,18 @@ describe("TablesLobby: la lista", () => {
     expect(screen.queryByText("Ya empezada")).not.toBeInTheDocument();
   });
 
+  it("guides the player with the three steps and explains the create form fields", async () => {
+    renderLobby(apiWith({ list: [], table: view() }));
+
+    const steps = await screen.findByRole("list", { name: "Cómo se juega en mesa" });
+    expect(within(steps).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(steps).getByText(/Creá una mesa o unite/).closest("li")).toHaveAttribute("aria-current", "step");
+    expect(await screen.findByText(/El ganador se lleva todo el pozo: con 2 jugadores, 20 fichas/)).toBeInTheDocument();
+    expect(screen.getByText(/Aparece en la lista de mesas abiertas/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("checkbox", { name: /Mesa privada/ }));
+    expect(screen.getByText(/te damos un código de 6 caracteres/)).toBeInTheDocument();
+  });
+
   it("says so when there are no open tables", async () => {
     renderLobby(apiWith({ list: [], table: view() }));
     expect(await screen.findByText(/No hay mesas abiertas/)).toBeInTheDocument();
@@ -227,6 +239,14 @@ describe("TablesLobby: la sala de espera", () => {
     expect(within(seats).getAllByText("Asiento libre")).toHaveLength(3);
     expect(screen.getByRole("button", { name: "Empezar" })).toBeDisabled();
     expect(screen.getByText(/Faltan 1 jugador para empezar \(mínimo 2\)/)).toBeInTheDocument();
+  });
+
+  it("shows the room as step 2 while the table is not ready to start", async () => {
+    renderLobby(apiWith(room()));
+
+    await screen.findByRole("list", { name: "Asientos" });
+    const steps = screen.getByRole("list", { name: "Cómo se juega en mesa" });
+    expect(within(steps).getByText(/Sumá bots o esperá/).closest("li")).toHaveAttribute("aria-current", "step");
   });
 
   it("blocks Empezar while the chips of a seat are not confirmed, then allows it", async () => {

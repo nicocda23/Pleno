@@ -49,6 +49,22 @@ export function TablesLobby<G>({ gameId, gameName, renderGame }: TablesLobbyProp
   return <TableList gameId={gameId} gameName={gameName} tables={tables.data} loading={tables.isLoading} failed={tables.isError} onEnter={enter} />;
 }
 
+const STEPS = ["Creá una mesa o unite a una abierta", "Sumá bots o esperá a otros jugadores", "El dueño toca Empezar y se reparte"];
+
+/** Los tres pasos de una partida entre jugadores, con el actual resaltado: guia a quien no sabe por donde empezar. */
+function HowItWorks({ current }: { current: 1 | 2 | 3 }) {
+  return (
+    <ol className="tl-steps" aria-label="Cómo se juega en mesa">
+      {STEPS.map((text, i) => (
+        <li key={text} className={`tl-step ${i + 1 === current ? "tl-step--now" : ""} ${i + 1 < current ? "tl-step--done" : ""}`} aria-current={i + 1 === current ? "step" : undefined}>
+          <span className="tl-step__n" aria-hidden="true">{i + 1 < current ? "✓" : i + 1}</span>
+          <span>{text}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
 // ---- Lista de mesas ----
@@ -82,6 +98,7 @@ function TableList({ gameId, gameName, tables, loading, failed, onEnter }: { gam
 
   return (
     <div className="stack">
+      <HowItWorks current={1} />
       <section className="card tl-list" aria-labelledby="tl-mesas">
         <h2 id="tl-mesas" className="section-title">Mesas abiertas</h2>
         {loading && <p className="muted" role="status">Cargando las mesas…</p>}
@@ -166,6 +183,7 @@ function CreateTable({ gameId, gameName, rules, rulesFailed, onCreated }: { game
   return (
     <section className="card" aria-labelledby="tl-crear">
       <h2 id="tl-crear" className="section-title">Crear mesa</h2>
+      <p className="muted tl-intro">¿No hay una mesa para vos? Armá la tuya: elegí cuántas fichas pone cada uno y cuántos juegan. Después la abrís a otros jugadores o sumás bots.</p>
       <form className="tl-form" onSubmit={(e) => void submit(e)}>
         <label className="field">
           <span>Nombre (opcional)</span>
@@ -173,8 +191,9 @@ function CreateTable({ gameId, gameName, rules, rulesFailed, onCreated }: { game
         </label>
         <label className="field">
           <span>Entrada (fichas)</span>
-          <input type="number" inputMode="numeric" min={rules.minBuyIn} max={rules.maxBuyIn} step={1} value={entry} aria-invalid={!entryValid} onChange={(e) => setBuyIn(Math.trunc(Number(e.target.value)))} />
+          <input type="number" inputMode="numeric" min={rules.minBuyIn} max={rules.maxBuyIn} step={1} value={entry} aria-invalid={!entryValid} aria-describedby="tl-entry-hint" onChange={(e) => setBuyIn(Math.trunc(Number(e.target.value)))} />
         </label>
+        <p id="tl-entry-hint" className="tl-hint">Lo que pone cada jugador para sentarse. El ganador se lleva todo el pozo{entryValid ? `: con ${plural(seats, "jugador", "jugadores")}, ${formatChips(entry * seats)} fichas` : ""}.</p>
         <div className="field" role="radiogroup" aria-label="Jugadores">
           <span>Jugadores</span>
           <div className="chips">
@@ -185,10 +204,12 @@ function CreateTable({ gameId, gameName, rules, rulesFailed, onCreated }: { game
             ))}
           </div>
         </div>
+        <p className="tl-hint">Cuántos asientos tiene la mesa; los que no ocupen personas los podés completar con bots.</p>
         <label className="tl-check">
-          <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+          <input type="checkbox" checked={isPrivate} aria-describedby="tl-private-hint" onChange={(e) => setIsPrivate(e.target.checked)} />
           <span>Mesa privada (se entra con un código)</span>
         </label>
+        <p id="tl-private-hint" className="tl-hint">{isPrivate ? "No aparece en la lista: te damos un código de 6 caracteres para pasarle a quien quieras que juegue." : "Aparece en la lista de mesas abiertas y cualquiera puede unirse."}</p>
         {!entryValid && <p className="notice notice--error" role="alert">La entrada va de {formatChips(rules.minBuyIn)} a {formatChips(rules.maxBuyIn)} fichas.</p>}
         {entryValid && !affordable && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa entrada.</p>}
         <button type="submit" className="btn btn--gold btn--lg" disabled={!entryValid || !affordable || create.isPending}>
@@ -278,6 +299,8 @@ function WaitingRoom({ gameId, gameName, table, onExit }: { gameId: string; game
   };
 
   return (
+    <div className="stack">
+    <HowItWorks current={table.seats.length < table.minPlayers || blocker !== null ? 2 : 3} />
     <section className="card tl-room" aria-labelledby="tl-sala">
       <h2 id="tl-sala" className="section-title">{table.name}</h2>
       <p className="muted">
@@ -334,5 +357,6 @@ function WaitingRoom({ gameId, gameName, table, onExit }: { gameId: string; game
         Salir de la mesa
       </button>
     </section>
+    </div>
   );
 }

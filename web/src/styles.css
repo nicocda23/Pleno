@@ -472,6 +472,14 @@ a { color: inherit; }
 .tl-seat__state { font-size: 0.85rem; color: var(--muted); }
 .tl-seat__state--ready { color: var(--win); font-weight: 700; }
 .tl-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.tl-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.tl-step { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 0.9rem; }
+.tl-step__n { flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-weight: 800; border: 2px solid var(--line); }
+.tl-step--now { color: var(--text); border-color: var(--gold); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 35%, transparent); font-weight: 700; }
+.tl-step--now .tl-step__n { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
+.tl-step--done .tl-step__n { border-color: var(--win); color: var(--win); }
+.tl-intro { margin: 0 0 10px; }
+.tl-hint { margin: -6px 0 0; font-size: 0.82rem; color: var(--muted); }
 
 /* Uno (.uno-*) */
 .uno-rules { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
