@@ -179,7 +179,7 @@ function UnoTable({ table, onLeave }: { table: LiveTable<UnoView>; onLeave: () =
           </div>
 
           {mySeat !== null && (
-            <div className="uno-mine">
+            <div className="uno-mine dock">
               <p className="bj-who">
                 Tu mano ({hand.length} {hand.length === 1 ? "carta" : "cartas"})
                 {myTurn ? ` · tu turno (${turnSeconds} s)` : ""}

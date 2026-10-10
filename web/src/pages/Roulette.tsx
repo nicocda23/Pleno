@@ -246,7 +246,7 @@ export function Roulette() {
           {stake > balance.available && balance.ready && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa apuesta.</p>}
           {error && <p className="notice notice--error" role="alert">{error}</p>}
 
-          <div className="actions">
+          <div className="actions dock">
             <span className="actions__group">
               <button type="button" className="btn btn--ghost" disabled={drops.length === 0 || spinning} onClick={() => setDrops((current) => current.slice(0, -1))}>
                 Deshacer

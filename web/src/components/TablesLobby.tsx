@@ -113,7 +113,7 @@ function TableList({ gameId, gameName, tables, loading, failed, onEnter }: { gam
         <form className="tl-code" onSubmit={submitCode}>
           <label className="field">
             <span>Tengo un código</span>
-            <input type="text" value={code} autoComplete="off" spellCheck={false} placeholder="Código de 6 caracteres" maxLength={6} onChange={(e) => setCode(e.target.value)} />
+            <input type="text" value={code} autoComplete="off" spellCheck={false} placeholder="6 caracteres" maxLength={6} onChange={(e) => setCode(e.target.value)} />
           </label>
           <button type="submit" className="btn btn--ghost" disabled={joinByCode.isPending || code.trim() === ""}>Entrar con el código</button>
         </form>

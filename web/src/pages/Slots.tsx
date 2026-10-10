@@ -242,9 +242,11 @@ function Machine({ paytable }: { paytable: Paytable }) {
           {stake > balance.available && balance.ready && stakeValid && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa apuesta.</p>}
           {error && <p className="notice notice--error" role="alert">{error}</p>}
 
-          <button type="button" className="btn btn--gold btn--lg btn--block" disabled={!canSpin} onClick={() => void submit()}>
-            {spinning ? "Girando…" : placeSpin.isPending ? "Enviando…" : `Girar por ${formatChips(stake)} fichas`}
-          </button>
+          <div className="dock">
+            <button type="button" className="btn btn--gold btn--lg btn--block" disabled={!canSpin} onClick={() => void submit()}>
+              {spinning ? "Girando…" : placeSpin.isPending ? "Enviando…" : `Girar por ${formatChips(stake)} fichas`}
+            </button>
+          </div>
 
           <h3 className="section-subtitle">Juego automático</h3>
           {auto > 0 ? (

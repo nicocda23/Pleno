@@ -145,6 +145,7 @@ function PokerTable({ table, onLeave }: { table: LiveTable<PokerView>; onLeave: 
             ))}
           </ul>
 
+          <div className="pk-dock dock">
           {mySeat !== null && (
             <div className="pk-mine">
               <p className="bj-who">Tus cartas</p>
@@ -158,6 +159,7 @@ function PokerTable({ table, onLeave }: { table: LiveTable<PokerView>; onLeave: 
           )}
 
           {myTurn && me && <ActionBar key={`${game.street}-${game.currentBet}-${game.pot}`} game={game} stack={me.stack} bet={me.bet} pending={act.isPending} onAct={send} />}
+          </div>
           {error && <p className="notice notice--error" role="alert">{error}</p>}
         </div>
 

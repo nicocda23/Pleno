@@ -215,7 +215,7 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
           )}
 
           {mySeat !== null && (
-            <div className="tru-mine">
+            <div className="tru-mine dock">
               <p className="bj-who">
                 Tu mano ({hand.length} {hand.length === 1 ? "carta" : "cartas"})
                 {myTurn ? ` · tu turno (${turnSeconds} s)` : ""}
