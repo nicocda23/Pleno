@@ -235,7 +235,7 @@ function TableView({ tableId, onLeave }: { tableId: string; onLeave: () => void 
           <h2 id="apuesta" className="section-title">Tu jugada</h2>
 
           {myTurn ? (
-            <div className="bj-actions">
+            <div className="bj-actions dock">
               <button type="button" className="btn btn--gold btn--lg" disabled={act.isPending} onClick={() => play("hit")}>Pedir</button>
               <button type="button" className="btn btn--ghost btn--lg" disabled={act.isPending} onClick={() => play("stand")}>Plantarme</button>
             </div>
@@ -257,9 +257,11 @@ function TableView({ tableId, onLeave }: { tableId: string; onLeave: () => void 
               </label>
               {!stakeValid && <p className="notice notice--error" role="alert">En esta mesa la apuesta va de {formatChips(min)} a {formatChips(max)} fichas.</p>}
               {stakeValid && stake > balance.available && balance.ready && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa apuesta.</p>}
-              <button type="button" className="btn btn--gold btn--lg btn--block" disabled={!canBet} onClick={() => void submit()}>
-                {placeBet.isPending ? "Enviando…" : "Sentarme y apostar"}
-              </button>
+              <div className="dock">
+                <button type="button" className="btn btn--gold btn--lg btn--block" disabled={!canBet} onClick={() => void submit()}>
+                  {placeBet.isPending ? "Enviando…" : "Sentarme y apostar"}
+                </button>
+              </div>
               {!bettingOpen && round && <p className="muted" role="status">La mesa está repartiendo: podés sentarte en la próxima mano.</p>}
             </>
           )}

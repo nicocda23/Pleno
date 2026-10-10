@@ -170,15 +170,17 @@ export function Crash() {
           {stake > balance.available && balance.ready && stakeValid && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa apuesta.</p>}
           {error && <p className="notice notice--error" role="alert">{error}</p>}
 
-          {bet?.inPlay && view.phase === "running" ? (
-            <button type="button" className="btn btn--gold btn--lg btn--block" disabled={cashOut.isPending} onClick={withdraw}>
-              {cashOut.isPending ? "Retirando…" : `Retirar ${formatChips(potential)} fichas (${formatMultiplier(view.multiplier)})`}
-            </button>
-          ) : (
-            <button type="button" className="btn btn--gold btn--lg btn--block" disabled={!canBet} onClick={() => void submit()}>
-              {placeBet.isPending ? "Enviando…" : myBetInThisRound ? "Apuesta hecha" : `Apostar ${formatChips(stake)} fichas`}
-            </button>
-          )}
+          <div className="dock">
+            {bet?.inPlay && view.phase === "running" ? (
+              <button type="button" className="btn btn--gold btn--lg btn--block" disabled={cashOut.isPending} onClick={withdraw}>
+                {cashOut.isPending ? "Retirando…" : `Retirar ${formatChips(potential)} fichas (${formatMultiplier(view.multiplier)})`}
+              </button>
+            ) : (
+              <button type="button" className="btn btn--gold btn--lg btn--block" disabled={!canBet} onClick={() => void submit()}>
+                {placeBet.isPending ? "Enviando…" : myBetInThisRound ? "Apuesta hecha" : `Apostar ${formatChips(stake)} fichas`}
+              </button>
+            )}
+          </div>
 
           {bet && myBetInThisRound && <BetStatus bet={bet} />}
           {bet?.status === "Rejected" && bet.roundId === round?.id && <p className="notice notice--error" role="alert">{failureMessage(bet.failureReason)}</p>}

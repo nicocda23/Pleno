@@ -63,3 +63,15 @@ web/e2e/       recorridos con navegador real
 - Movimientos (`/movimientos`): extracto de la cuenta con el saldo después de cada cambio, derivado del ledger. El administrador tiene el historial completo de cargas (`/admin/cargas`) con filtros por jugador y fechas y el total del filtro.
 - Historial con verificación: revelar la semilla y abrir la página pública `/verify` ya completa.
 - Truco (`/truco`): segunda página sobre `TablesLobby` (2 jugadores o jugador contra bot, a 15 puntos, 45 s por turno): tablero con marcador, tus cartas clickeables solo cuando `actions` incluye `play`, mesa agrupada por baza con su resultado, canto pendiente ("Jugador 2 cantó truco: ¿quiero?"), botones de canto agrupados (Envido · Truco · Respuesta, "Al mazo" aparte) que salen de `actions`, tus puntos de envido (solo para vos) y verificación del compromiso. La decodificación de cartas y los textos están en `web/src/lib/truco.ts`.
+
+## Celular
+Está pensado para usarse con el pulgar. Lo que se cuida (y se prueba en `web/e2e/mobile.spec.ts`, el proyecto `mobile` de Playwright con la pantalla de un Pixel 7 y una de 360 x 640):
+- **Barra superior de una sola fila** (menos de 64 px; antes eran 125): marca, saldo y un botón de menú. La navegación, el tema y el usuario/Salir viven en el menú desplegable (`☰`), que se cierra
+  con Escape, con un toque afuera o al navegar. En escritorio la barra no cambia.
+- **Botón principal siempre a la vista:** Apostar (ruleta), Girar (tragamonedas), Apostar/Retirar (crash), Sentarme y apostar (blackjack) y, en las mesas de cartas, *tu mano y tus botones*
+  (Uno, Truco, Poker) van en una **barra pegada abajo** (`.dock`). En partida desaparece el título de la página y el rótulo de la mesa para que el tablero arranque arriba.
+- Las manos de cartas de Uno y Truco son **una fila que se desliza**; Poker pone tus cartas al lado de Retirarme/Pasar y la subida abajo a lo ancho.
+- Lobby con los juegos de a dos y cortos (sin la descripción); formularios de mesas a lo ancho; sin scroll horizontal en ninguna pantalla; botones de al menos 44 px de alto.
+Los ajustes de celular están en `@media (max-width: 640px)` de `styles.css`; los específicos de cada juego, en un bloque **al final** del archivo (para ganarle a las reglas base de cada juego).
+`npm --prefix web run e2e -- --project=mobile` corre solo las pruebas de celular (necesita `aspire start`).
+
