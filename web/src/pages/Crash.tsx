@@ -17,7 +17,7 @@ const CHIPS = [10, 50, 100, 500];
 /** Crash: un cohete sube con un multiplicador y explota cuando decide el servidor; hay que retirar antes. La ronda es compartida por todos los jugadores. */
 export function Crash() {
   const state = useCrashState();
-  const { balance, onGameEvent } = useRealtime();
+  const { balance, connection, onGameEvent } = useRealtime();
   const queryClient = useQueryClient();
   const toasts = useToasts();
   const placeBet = usePlaceCrashBet();
@@ -76,7 +76,12 @@ export function Crash() {
   const autoValue = auto.trim() === "" ? null : parseAutoCashOut(auto);
   const autoValid = auto.trim() === "" || autoValue !== null;
   const stakeValid = Number.isInteger(stake) && stake >= (data?.minStake ?? 1) && stake <= (data?.maxStake ?? 10_000);
-  const canBet = view.phase === "betting" && view.secondsLeft > 0.3 && !myBetInThisRound && stakeValid && autoValid && stake <= balance.available && !placeBet.isPending;
+  // Sin tiempo real conectado no se aceptan apuestas: el retiro depende de ver la ronda en vivo y no se puede perder fichas sin poder cobrar.
+  const live = connection === "connected";
+  const canBet = view.phase === "betting" && view.secondsLeft > 0.3 && live && !myBetInThisRound && stakeValid && autoValid && stake <= balance.available && !placeBet.isPending;
+  // La apuesta en juego siempre tiene su boton de retiro: si el reloj ya paso el cierre pero el estado todavia dice "Betting", el cohete esta despegando.
+  const liftingOff = view.phase === "betting" && view.secondsLeft <= 0;
+  const canWithdraw = bet?.inPlay === true && (view.phase === "running" || liftingOff);
 
   const submit = async () => {
     setError(null);
@@ -159,12 +164,13 @@ export function Crash() {
 
           {!autoValid && <p className="notice notice--error" role="alert">El retiro automático tiene que estar entre 1,01 y 1000.</p>}
           {stake > balance.available && balance.ready && stakeValid && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa apuesta.</p>}
+          {!live && view.phase === "betting" && !myBetInThisRound && <p className="notice notice--error" role="alert">Sin conexión en vivo no se puede apostar: reconectando…</p>}
           {error && <p className="notice notice--error" role="alert">{error}</p>}
 
           <div className="dock">
-            {bet?.inPlay && view.phase === "running" ? (
-              <button type="button" className="btn btn--gold btn--lg btn--block" disabled={cashOut.isPending} onClick={withdraw}>
-                {cashOut.isPending ? "Retirando…" : `Retirar ${formatChips(potential)} fichas (${formatMultiplier(view.multiplier)})`}
+            {canWithdraw || (bet?.inPlay && view.phase === "betting") ? (
+              <button type="button" className="btn btn--gold btn--lg btn--block" disabled={cashOut.isPending || !canWithdraw} onClick={withdraw}>
+                {cashOut.isPending ? "Retirando…" : !canWithdraw ? "Retirar (disponible al despegar)" : `Retirar ${formatChips(potential)} fichas (${formatMultiplier(view.multiplier)})`}
               </button>
             ) : (
               <button type="button" className="btn btn--gold btn--lg btn--block" disabled={!canBet} onClick={() => void submit()}>
