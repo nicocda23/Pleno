@@ -484,6 +484,66 @@ export interface UnoView {
 /** La jugada propia de Uno. */
 export type UnoAction = { type: "play"; card: number; color?: number } | { type: "draw" } | { type: "pass" };
 
+// Poker (Texas Hold'em de una mano por mesa)
+export type PokerStreet = "preflop" | "flop" | "turn" | "river" | "done";
+export type PokerEventKind = "blind" | "fold" | "check" | "call" | "bet" | "raise" | "flop" | "turn" | "river" | "win" | "win_showdown";
+export type PokerCategoryName = "HighCard" | "Pair" | "TwoPair" | "ThreeOfAKind" | "Straight" | "Flush" | "FullHouse" | "FourOfAKind" | "StraightFlush";
+export type PokerActionName = "call" | "check" | "fold" | "raise";
+
+export interface PokerEvent {
+  /** -1 en los eventos de calle (flop, turn, river). */
+  seat: number;
+  kind: PokerEventKind;
+  amount: number | null;
+  allIn: boolean;
+}
+
+export interface PokerPlayer {
+  seat: number;
+  stack: number;
+  /** Lo puesto en esta ronda de apuestas. */
+  bet: number;
+  folded: boolean;
+  allIn: boolean;
+  acted: boolean;
+  /** null salvo las propias y, al showdown, las de quienes siguen en la mano. */
+  cards: number[] | null;
+  cardCount: number;
+}
+
+export interface PokerShowdownEntry {
+  seat: number;
+  cards: number[];
+  category: PokerCategoryName;
+  won: boolean;
+}
+
+/** Lo que ve mi asiento de la mano. */
+export interface PokerView {
+  you: number | null;
+  hand: number[];
+  board: number[];
+  street: PokerStreet;
+  pot: number;
+  players: PokerPlayer[];
+  dealer: number;
+  smallBlindSeat: number;
+  bigBlindSeat: number;
+  current: number;
+  currentBet: number;
+  toCall: number;
+  minRaiseTo: number;
+  maxRaiseTo: number;
+  actions: PokerActionName[];
+  showdown: PokerShowdownEntry[];
+  winnings: number[];
+  done: boolean;
+  events: PokerEvent[];
+}
+
+/** La jugada propia de Poker. `to`: monto TOTAL al que se sube en esta ronda. */
+export type PokerAction = { type: "fold" } | { type: "check" } | { type: "call" } | { type: "raise"; to: number };
+
 // Truco
 export type TrucoEventKind = "start" | "play" | "truco" | "retruco" | "vale4" | "envido" | "real_envido" | "falta_envido" | "quiero" | "no_quiero" | "mazo" | "baza" | "parda" | "envido_result" | "hand_end";
 

@@ -138,7 +138,7 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 - [x] Blackjack: primer juego de mesas (mesas fijas contra el crupier, varios jugadores por mesa, mazo provably fair; ADR 0011, `docs/juego-blackjack.md`)
 - [x] Plataforma de mesas entre jugadores (mesas de jugador publicas y privadas, bots, turnos, fichas en la Wallet) y Uno como primer juego (ADR 0012, `docs/juegos-mesas.md`, `docs/juego-uno.md`)
 - [x] Truco a dos jugadores sobre la plataforma de mesas (envido, truco, retruco, vale cuatro; `docs/juego-truco.md`)
-- [ ] Poker (Texas Hold'em) sobre la plataforma de mesas entre jugadores
+- [x] Poker (Texas Hold'em de una mano por mesa) sobre la plataforma de mesas entre jugadores (`docs/juego-poker.md`)
 - [ ] Torneos con leaderboard en Redis
 - [ ] Deploy en Azure Container Apps con Bicep
 - [ ] Backoffice con ajustes manuales y doble aprobación
