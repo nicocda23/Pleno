@@ -260,7 +260,8 @@ export function useCrashState() {
       // Se supone que la respuesta tardo lo mismo en ir que en volver: la hora del servidor corresponde a la mitad del viaje.
       return { ...state, offsetMs: Date.parse(state.serverNow) - (sentAt + receivedAt) / 2 };
     },
-    refetchInterval: 1_000,
+    // Con una apuesta en juego se consulta mas seguido: asi el boton de retiro aparece apenas despega el cohete aunque se pierda un aviso en vivo.
+    refetchInterval: (query) => (query.state.data?.myBet?.inPlay ? 250 : 1_000),
   });
 }
 

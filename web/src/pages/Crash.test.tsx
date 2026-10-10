@@ -4,7 +4,7 @@ import { vi } from "vitest";
 import { ApiError } from "../api/client";
 import type { CrashBet, CrashRound, CrashState } from "../api/types";
 import { sha256Hex } from "../lib/crash";
-import { fakeApi, renderApp, type FakeApi } from "../test/harness";
+import { FakeHub, fakeApi, renderApp, type FakeApi } from "../test/harness";
 import { Crash } from "./Crash";
 
 const account = { accountId: "a1", userId: "u1", available: 1_000, reserved: 0, version: 2, openReservations: {} };
@@ -143,6 +143,28 @@ describe("Crash", () => {
 
     expect(await screen.findByText("Retiraste en 2,34x y cobrás 234 fichas.")).toBeInTheDocument();
     expect(api.calls.some((c) => c.method === "POST" && c.path === "/games/crash/bets/bet-1/cashout")).toBe(true);
+  });
+
+  it("keeps the cash out button for a bet in play: disabled while betting, enabled as soon as the clock passes the close even if the state is stale", async () => {
+    const waiting = round({ bettingEndsAt: iso(60_000) });
+    const { unmount } = renderApp(<Crash />, { api: apiWith({ current: state(waiting, bet()) }) });
+    expect(await screen.findByRole("button", { name: /Retirar \(disponible al despegar\)/ })).toBeDisabled();
+    unmount();
+
+    const stale = round({ bettingEndsAt: iso(-500) }); // el servidor todavia dice "Betting" pero ya paso el cierre
+    renderApp(<Crash />, { api: apiWith({ current: state(stale, bet()) }) });
+    expect(await screen.findByRole("button", { name: /Retirar \d+ fichas/ })).toBeEnabled();
+  });
+
+  it("does not let the player bet without the live connection, and says why", async () => {
+    const hub = new FakeHub();
+    renderApp(<Crash />, { api: apiWith({ current: state(round()) }), hub });
+    await waitFor(() => expect(screen.getByRole("button", { name: /Apostar 10 fichas/ })).toBeEnabled());
+
+    act(() => hub.dropConnection());
+
+    expect(await screen.findByText(/Sin conexión en vivo no se puede apostar/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Apostar 10 fichas/ })).toBeDisabled();
   });
 
   it("explains when the rocket crashed before the cash out arrived", async () => {
