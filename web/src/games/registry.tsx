@@ -22,12 +22,11 @@ export const GAME_PAGES: readonly GamePage[] = [
   { id: "crash", route: "crash", component: lazy(() => import("../pages/Crash").then((m) => ({ default: m.Crash }))) },
   { id: "blackjack", route: "blackjack", component: lazy(() => import("../pages/Blackjack").then((m) => ({ default: m.Blackjack }))) },
   { id: "uno", route: "uno", component: lazy(() => import("../pages/Uno").then((m) => ({ default: m.Uno }))) },
+  { id: "poker", route: "poker", component: lazy(() => import("../pages/Poker").then((m) => ({ default: m.Poker }))) },
 ];
 
 /** Lo que viene en el roadmap y todavia no existe: se muestra como "Proximamente" (no depende del servidor). */
-export const COMING_SOON: readonly Pick<GameInfo, "id" | "name" | "tagline" | "glyph">[] = [
-  { id: "poker", name: "Poker", tagline: "Torneos con tabla de posiciones.", glyph: "♦" },
-];
+export const COMING_SOON: readonly Pick<GameInfo, "id" | "name" | "tagline" | "glyph">[] = [];
 
 export const pageFor = (id: string): GamePage | undefined => GAME_PAGES.find((page) => page.id === id);
 

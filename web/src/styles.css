@@ -488,3 +488,60 @@ button.uno-card--playable:hover { transform: translateY(-14px); }
 @media (prefers-reduced-motion: reduce) {
   .uno-card, .uno-pile__back { transition: none; }
 }
+
+/* Poker (.pk-*) */
+.pk-rules { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.pk-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.pk-head .muted { margin: 0; }
+.pk-felt { display: grid; gap: 18px; padding: 16px; border-radius: var(--radius); border: 2px solid var(--gold); background: radial-gradient(ellipse at top, #1f6b45, #0f3d28); color: #f4efe2; }
+.pk-felt .muted { color: #d6ceb8; }
+.pk-center { display: grid; gap: 8px; justify-items: center; }
+.pk-board { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.pk-pot { margin: 0; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.pk-street { margin-left: 8px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: #f2c230; }
+.pk-card { position: relative; display: inline-grid; place-items: center; flex: none; border-radius: 8px; border: 2px solid #fffdf6; background: #fffdf6; color: #1b1b1b; font-weight: 900; box-shadow: 0 2px 6px rgb(0 0 0 / 0.45); }
+.pk-card--sm { width: 32px; height: 46px; font-size: 0.8rem; }
+.pk-card--md { width: 54px; height: 78px; font-size: 1.1rem; }
+.pk-card--lg { width: 78px; height: 112px; font-size: 1.6rem; }
+.pk-card--red { color: #c8202f; }
+.pk-card--win { box-shadow: 0 0 0 3px var(--gold), 0 2px 6px rgb(0 0 0 / 0.45); }
+.pk-card__rank { line-height: 1; }
+.pk-card__suit { line-height: 1; font-size: 1.3em; }
+.pk-card--back { background: repeating-linear-gradient(45deg, #7a1f2b, #7a1f2b 5px, #5a1520 5px, #5a1520 10px); }
+.pk-card--empty { background: rgb(0 0 0 / 0.2); border: 2px dashed rgb(255 253 246 / 0.4); box-shadow: none; }
+.pk-players { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.pk-player { display: grid; gap: 4px; align-content: start; padding: 10px; border-radius: 12px; background: rgb(0 0 0 / 0.25); border: 2px solid transparent; }
+.pk-player--mine { border-color: rgb(244 239 226 / 0.5); }
+.pk-player--active { box-shadow: 0 0 0 3px var(--win); }
+.pk-player--folded { opacity: 0.55; }
+.pk-player--winner { border-color: var(--gold); }
+.pk-player p { margin: 0; }
+.pk-player__name { font-weight: 800; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.pk-player__stack { font-variant-numeric: tabular-nums; }
+.pk-player__bet { display: flex; align-items: center; gap: 6px; font-weight: 800; font-variant-numeric: tabular-nums; color: #f2c230; }
+.pk-player__state { font-size: 0.8rem; font-weight: 700; color: #f2c230; }
+.pk-player__state--allin { color: #ff9a8a; }
+.pk-player__hand { font-weight: 800; color: #8ff0bf; }
+.pk-player__cards { display: flex; gap: 4px; }
+.pk-chip { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 3px dashed #fffdf6; background: #c8202f; }
+.pk-tag { display: inline-grid; place-items: center; min-width: 22px; padding: 0 5px; height: 20px; border-radius: 10px; font-size: 0.7rem; font-weight: 900; background: #f2c230; color: #1b1b1b; }
+.pk-tag--bot { background: rgb(255 255 255 / 0.2); color: #f4efe2; }
+.pk-tag--win { padding: 0 10px; background: var(--gold); color: var(--gold-ink); }
+.pk-mine { display: grid; gap: 8px; }
+.pk-hand { display: flex; gap: 10px; min-height: 112px; align-items: center; }
+.pk-actions { display: grid; gap: 12px; padding: 12px; border-radius: 12px; background: rgb(0 0 0 / 0.3); }
+.pk-actions__main { display: flex; flex-wrap: wrap; gap: 10px; }
+.pk-raise { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.pk-raise legend { padding: 0; }
+.pk-raise:disabled { opacity: 0.5; }
+.pk-raise__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pk-raise__row input[type="range"] { flex: 1 1 160px; min-width: 0; }
+.pk-raise__input { width: 110px; padding: 8px 10px; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); color: var(--text); font: inherit; font-variant-numeric: tabular-nums; }
+.pk-result { display: grid; gap: 8px; margin-top: 14px; }
+.pk-result p { margin: 0; }
+.pk-events { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.pk-showdown { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pk-showdown__row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 12px; border: 2px solid var(--line); }
+.pk-showdown__row--won { border-color: var(--gold); }
+.pk-showdown__name { font-weight: 800; min-width: 90px; }
+.pk-showdown__cards { display: inline-flex; gap: 4px; }

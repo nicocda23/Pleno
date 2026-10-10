@@ -68,14 +68,20 @@ describe("Lobby catalog", () => {
     expect(section().getAllByText("Uno")).toHaveLength(1);
   });
 
-  it("keeps the roadmap games as coming soon while they do not exist", async () => {
+  it("lists Poker with a link now that the front has its page", async () => {
+    const poker: GameInfo = { id: "poker", name: "Poker", tagline: "Texas Hold'em entre jugadores.", route: "/poker", glyph: "P", resolution: "Server" };
+    renderApp(<Lobby />, { api: apiWith(() => [roulette, slots, poker]) });
+
+    expect(await section().findByRole("link", { name: /Poker/ })).toHaveAttribute("href", "/poker");
+    expect(section().getAllByText("Poker")).toHaveLength(1);
+  });
+
+  it("does not show as coming soon a game the server does not have and the front already has a page for", async () => {
     renderApp(<Lobby />, { api: apiWith(() => [roulette, slots]) });
 
     await section().findByRole("link", { name: /Ruleta europea/ });
-    expect(section().getByText("Poker")).toBeInTheDocument();
-    expect(section().queryByText("Blackjack")).not.toBeInTheDocument(); // ya no esta en el roadmap: si el servidor no lo tiene, no se muestra
-    expect(section().queryByRole("link", { name: /Poker/ })).not.toBeInTheDocument();
-    expect(section().getAllByText("Próximamente").length).toBeGreaterThanOrEqual(1);
+    expect(section().queryByText("Poker")).not.toBeInTheDocument();
+    expect(section().queryByText("Blackjack")).not.toBeInTheDocument();
   });
 
   it("tells the player when the catalog cannot be loaded", async () => {
