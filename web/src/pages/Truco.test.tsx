@@ -153,6 +153,31 @@ describe("Truco", () => {
     expect(screen.getByTestId("tru-info")).toHaveTextContent("Ronda 4");
   });
 
+  it("announces in big signs what the rival calls and answers, but not what was already there when the page opened", async () => {
+    const old = { seat: 1, kind: "truco" as const, card: null, value: null, a: null, b: null };
+    const scenario: Scenario = { table: view({ game: game({ events: [old] }) }) };
+    renderApp(<Truco />, { api: apiWith(scenario) });
+    await screen.findByTestId("tru-score-me");
+    expect(screen.queryByTestId("tru-banner")).not.toBeInTheDocument(); // lo que ya habia al entrar no se anuncia
+
+    scenario.table = view({ game: game({ events: [old, { seat: 1, kind: "retruco", card: null, value: null, a: null, b: null }] }) });
+    const sign = await screen.findByTestId("tru-banner", {}, { timeout: 2_500 });
+    expect(sign).toHaveTextContent("¡RETRUCO!");
+    expect(sign).toHaveTextContent("Bot 2 te cantó");
+
+    scenario.table = view({ game: game({ events: [old, { seat: 1, kind: "retruco", card: null, value: null, a: null, b: null }, { seat: 1, kind: "hand_end", card: null, value: 3, a: null, b: null }] }) });
+    await waitFor(() => expect(screen.getAllByTestId("tru-banner").map((b) => b.textContent).join(" ")).toContain("Perdiste la ronda"), { timeout: 2_500 });
+  });
+
+  it("shows the rival cards as a fan next to the table instead of a full row", async () => {
+    renderApp(<Truco />, { api: apiWith({ table: view() }) });
+
+    const fan = await screen.findByRole("img", { name: "Bot 2 tiene 3 cartas" });
+    expect(fan).toHaveClass("tru-fan");
+    expect(fan.querySelectorAll(".tru-card--back")).toHaveLength(3);
+    expect(fan.closest(".tru-board")).not.toBeNull(); // comparte renglon con la mesa
+  });
+
   it("says the bot is thinking while it is its turn", async () => {
     renderApp(<Truco />, { api: apiWith({ table: view({ turnSeat: 1, game: game({ current: 1, actions: [] }) }) }) });
 

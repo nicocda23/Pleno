@@ -610,7 +610,7 @@ button.uno-card--playable:hover { transform: translateY(-14px); }
 .tru-rules { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .tru-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
 .tru-head .muted { margin: 0; }
-.tru-felt { display: grid; gap: 16px; padding: 16px; border-radius: var(--radius); border: 2px solid var(--gold); background: radial-gradient(ellipse at top, #1f6b45, #0f3d28); color: #f4efe2; }
+.tru-felt { position: relative; display: grid; gap: 8px; padding: 12px; border-radius: var(--radius); border: 2px solid var(--gold); background: radial-gradient(ellipse at top, #1f6b45, #0f3d28); color: #f4efe2; }
 .tru-felt p { margin: 0; }
 .tru-none, .tru-info, .tru-score__target { color: #d6ceb8; font-size: 0.9rem; }
 .tru-score { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -618,7 +618,29 @@ button.uno-card--playable:hover { transform: translateY(-14px); }
 .tru-score__side--active { box-shadow: 0 0 0 3px var(--win); }
 .tru-score__name { font-size: 0.85rem; font-weight: 700; }
 .tru-score__points { font-size: 2rem; line-height: 1; }
-.tru-opp { display: grid; gap: 6px; padding: 10px; border-radius: 12px; background: rgb(0 0 0 / 0.25); border: 2px solid transparent; }
+/* Tablero: el rival a un costado (con las cartas en abanico, como agarradas con la mano) y la mesa al lado, sin ocupar un renglon entero. */
+.tru-board { display: grid; grid-template-columns: minmax(112px, 150px) minmax(0, 1fr); gap: 10px; align-items: center; }
+.tru-opp { display: grid; justify-items: center; gap: 4px; padding: 8px; border-radius: 12px; background: rgb(0 0 0 / 0.25); border: 2px solid transparent; text-align: center; }
+.tru-fan { position: relative; width: 120px; height: 112px; }
+.tru-fan__card { position: absolute; left: 50%; bottom: 14px; width: 44px; height: 66px; margin-left: -22px; transform-origin: 50% 100%; transform: rotate(calc((var(--i) - (var(--n) - 1) / 2) * 20deg)); z-index: calc(var(--i) + 1); box-shadow: 0 2px 5px rgb(0 0 0 / 0.5); }
+.tru-fan__hand { position: absolute; left: 50%; bottom: 0; width: 50px; height: 28px; margin-left: -25px; z-index: 9; border-radius: 10px 10px 16px 16px; background: repeating-linear-gradient(90deg, #e8b98f 0 11px, #d9a577 11px 12px); box-shadow: 0 2px 4px rgb(0 0 0 / 0.5); }
+.tru-fan__hand::after { content: ""; position: absolute; right: -9px; top: 6px; width: 16px; height: 11px; border-radius: 8px; background: #e8b98f; transform: rotate(-30deg); }
+.tru-fan__none { position: absolute; inset: 0 0 30px; display: grid; place-items: center; }
+/* Carteles de lo que pasa (canto, respuesta, mano, envido, ronda) sobre el tapete */
+.tru-banners { position: absolute; z-index: 20; left: 12px; right: 12px; top: 64px; display: grid; gap: 6px; justify-items: center; pointer-events: none; }
+.tru-banner { margin: 0; display: grid; justify-items: center; gap: 0; padding: 8px 22px; border-radius: 14px; text-align: center; color: #fff; background: rgb(15 20 18 / 0.92); border: 3px solid #f2c230; box-shadow: 0 8px 22px rgb(0 0 0 / 0.55); animation: tru-banner-in 0.28s ease-out; }
+.tru-banner strong { font-size: 1.6rem; line-height: 1.1; letter-spacing: 0.03em; text-transform: uppercase; }
+.tru-banner span { font-size: 0.85rem; color: #e6dfc8; }
+.tru-banner--good { border-color: #2fa968; }
+.tru-banner--good strong { color: #8ff0bf; }
+.tru-banner--bad { border-color: #d63a3a; }
+.tru-banner--bad strong { color: #ff9c9c; }
+.tru-banner--call strong { color: #f2c230; }
+.tru-banner--info { border-color: #b9b29a; }
+@keyframes tru-banner-in { from { opacity: 0; transform: translateY(-12px) scale(0.92); } to { opacity: 1; transform: none; } }
+.tru-result__headline { margin: 0; font-size: 1.5rem; font-weight: 900; }
+.tru-result__headline--won { color: var(--win); }
+.tru-result__headline--lost { color: var(--loss); }
 .tru-opp[aria-current="true"] { box-shadow: 0 0 0 3px var(--win); }
 .tru-hand { display: flex; flex-wrap: wrap; gap: 8px; min-height: 96px; align-items: center; }
 .tru-card { position: relative; display: inline-block; overflow: hidden; flex: none; width: 66px; height: 99px; padding: 0; border-radius: 10px; border: 2px solid #fffdf6; background: #fbf6e8; color: var(--tru-suit, #333); font-family: inherit; font-weight: 900; box-shadow: 0 2px 6px rgb(0 0 0 / 0.45); }
@@ -630,7 +652,7 @@ button.tru-card:disabled { cursor: default; }
 button.tru-card--playable:hover { transform: translateY(-14px); }
 .tru-card--dim { opacity: 0.55; }
 .tru-table { display: grid; gap: 8px; justify-items: center; padding: 10px; border-radius: 12px; background: rgb(0 0 0 / 0.18); }
-.tru-pile { position: relative; width: min(100%, 280px); height: 230px; }
+.tru-pile { position: relative; width: min(100%, 280px); height: 200px; }
 .tru-pile__card {
   position: absolute; left: 50%; top: 50%; filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.45));
   transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) rotate(var(--rot, 0deg));
@@ -659,6 +681,7 @@ button.tru-card--playable:hover { transform: translateY(-14px); }
 .tru-events { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
 @media (prefers-reduced-motion: reduce) {
   .tru-card { transition: none; }
+  .tru-banner { animation: none; }
 }
 
 /* ---- Celular: ajustes de las mesas de cartas (al final del archivo para ganarle a las reglas base de cada juego) ---- */
@@ -742,8 +765,11 @@ button.tru-card--playable:hover { transform: translateY(-14px); }
   .hero .display { font-size: 1.4rem; }
 
   /* Truco: la pila de cartas jugadas mas baja (la carta de la mesa es mas chica en el celular). */
-  .tru-pile { height: 196px; }
+  .tru-pile { height: 176px; }
   .tru-table { padding: 6px; gap: 4px; }
+  .tru-board { grid-template-columns: 104px minmax(0, 1fr); gap: 6px; }
+  .tru-fan { transform: scale(0.9); transform-origin: 50% 100%; }
+  .tru-banner strong { font-size: 1.3rem; }
 }
 
 

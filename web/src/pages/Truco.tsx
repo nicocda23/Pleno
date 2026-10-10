@@ -1,14 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type CSSProperties } from "react";
 import { queryKeys, useTableAction } from "../api/hooks";
-import type { TrucoAction, TrucoActionType, TrucoPlay, TrucoView } from "../api/types";
+import type { TrucoAction, TrucoActionType, TrucoEvent, TrucoPlay, TrucoView } from "../api/types";
 import { Confetti } from "../components/Confetti";
 import { SpanishCardFace } from "../components/SpanishCard";
 import { TablesLobby, type LiveTable } from "../components/TablesLobby";
 import { sha256Hex } from "../lib/crash";
 import { formatChips } from "../lib/format";
 import { detailedErrorMessage } from "../lib/messages";
-import { MANO_NAMES, SUIT_CSS, actionLabel, byStrength, decodeCard, eventText, groupOf, GROUP_LABELS, pendingText, pileSpot, playBody, trucoLevelName, trucoWorth, type ActionGroup } from "../lib/truco";
+import { MANO_NAMES, SUIT_CSS, actionLabel, bannerFor, byStrength, decodeCard, eventText, groupOf, GROUP_LABELS, newEvents, pendingText, pileSpot, playBody, trucoLevelName, trucoWorth, type ActionGroup, type Banner } from "../lib/truco";
 import { playWinSound } from "../lib/winSound";
 
 const GAME_ID = "truco";
@@ -98,6 +98,25 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
     const id = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(id);
   }, []);
+
+  // Carteles: cada hecho nuevo de la partida (cantos, respuestas, manos, envido, ronda) se avisa en grande unos segundos. Lo que ya habia al entrar no se anuncia.
+  const [eventsSeen, setEventsSeen] = useState<TrucoEvent[] | null>(null);
+  const [banners, setBanners] = useState<(Banner & { id: number; until: number })[]>([]);
+  const eventsKey = game ? JSON.stringify(game.events) : null;
+  const [seenKey, setSeenKey] = useState<string | null>(null);
+  if (game && eventsKey !== seenKey) {
+    setSeenKey(eventsKey);
+    if (eventsSeen !== null) {
+      const fresh = newEvents(eventsSeen, game.events).slice(-4);
+      const nameFor = (seat: number): string => table.seats.find((s) => s.seat === seat)?.name ?? `Asiento ${seat + 1}`;
+      const made = fresh.flatMap((event, i) => {
+        const banner = bannerFor(event, table.mySeat, nameFor);
+        return banner === null ? [] : [{ ...banner, id: now + i, until: now + banner.ms }];
+      });
+      if (made.length > 0) setBanners((current) => [...current.filter((b) => b.until > now), ...made].slice(-3));
+    }
+    setEventsSeen(game.events);
+  }
   useEffect(() => {
     if (!recap) return;
     const id = window.setTimeout(() => setRecap(null), RECAP_MS);
@@ -178,6 +197,14 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
         <p role="status" className="crash-status" data-testid="tru-status">{statusLabel}</p>
 
         <div className="tru-felt">
+          <div className="tru-banners" role="status" aria-live="polite" data-testid="tru-banners">
+            {banners.filter((b) => b.until > now).map((b) => (
+              <p key={b.id} className={`tru-banner tru-banner--${b.tone}`} data-testid="tru-banner">
+                <strong>{b.title}</strong>
+                {b.detail && <span>{b.detail}</span>}
+              </p>
+            ))}
+          </div>
           <div className="tru-score" data-testid="tru-score" role="group" aria-label={`Marcador, a ${game.target} puntos`}>
             <p className={`tru-score__side ${playing && game.current === me ? "tru-score__side--active" : ""}`}>
               <span className="tru-score__name">{mySeat === null ? nameOf(me) : "Vos"}{game.mano === me ? " · es mano" : ""}</span>
@@ -193,6 +220,7 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
             Ronda {game.handNo} · {game.trucoLevel > 0 ? `${trucoLevelName(game.trucoLevel)} aceptado` : "sin truco"} · vale {worth} {worth === 1 ? "punto" : "puntos"}
           </p>
 
+          <div className="tru-board">
           <div className="tru-opp" data-testid="tru-opp" aria-current={playing && game.current === rival ? "true" : undefined}>
             <p className="bj-who">
               {nameOf(rival)}
@@ -200,11 +228,12 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
               {rivalSeat?.isBot ? " · Bot" : ""}
               {rivalSeat?.away && !rivalSeat.isBot ? " · ausente: lo juega un bot" : ""}
             </p>
-            <div className="tru-hand" role="img" aria-label={`${nameOf(rival)} tiene ${game.opponentCards} ${game.opponentCards === 1 ? "carta" : "cartas"}`}>
+            <div className="tru-fan" style={{ "--n": game.opponentCards } as CSSProperties} role="img" aria-label={`${nameOf(rival)} tiene ${game.opponentCards} ${game.opponentCards === 1 ? "carta" : "cartas"}`}>
               {Array.from({ length: game.opponentCards }, (_, i) => (
-                <span key={i} className="tru-card tru-card--back" aria-hidden="true" />
+                <span key={i} className="tru-card tru-card--back tru-fan__card" style={{ "--i": i } as CSSProperties} aria-hidden="true" />
               ))}
-              {game.opponentCards === 0 && <span className="tru-none">Sin cartas</span>}
+              <span className="tru-fan__hand" aria-hidden="true" />
+              {game.opponentCards === 0 && <span className="tru-none tru-fan__none">Sin cartas</span>}
             </div>
           </div>
 
@@ -229,6 +258,7 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
                 </li>
               ))}
             </ol>
+          </div>
           </div>
 
           {playing && game.pending !== null && (
@@ -292,6 +322,7 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
 
         {finished && (
           <div role="status" className="tru-result" data-testid="tru-result">
+            {mySeat !== null && winner >= 0 && <p className={`tru-result__headline ${iWon ? "tru-result__headline--won" : "tru-result__headline--lost"}`}>{iWon ? "¡Ganaste la partida!" : "Perdiste la partida"}</p>}
             <p><strong>{winner < 0 ? "Nadie ganó: se devolvieron las entradas." : iWon ? `¡Ganaste! ${net !== null && net >= 0 ? "+" : ""}${formatChips(net ?? 0)} fichas` : `Ganó ${nameOf(winner)}.`}</strong></p>
             {payout !== null && (
               <p className="muted">

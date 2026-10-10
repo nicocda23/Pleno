@@ -20,10 +20,11 @@ Formato: `- [ ]` pendiente · `- [x]` hecho. Agregar la fecha o el PR al cerrar 
 - [ ] _(anotar)_
 
 ### Truco
-- [ ] _(anotar)_
+- [x] **Truco: más cartelería y mejor distribución.** No se entendía qué respondía el rival ante cada canto ni si se ganaba o perdía: ahora hay carteles grandes (canto, quiero/no quiero, mano ganada/perdida, envido, ronda y partida). El marcador quedaba muy arriba y las cartas muy abajo: se redujo el espacio y las cartas del rival van a un costado, en abanico (triángulo invertido) agarradas por una mano, sin ocupar un renglón entero.
 
 ### Crash
 - [ ] **CRÍTICO: a veces no aparece la opción de retirar (detener) tras iniciar la apuesta.** El jugador pierde las fichas sin poder cobrar. Causa desconocida. Mínimo: no debe iniciarse/debitarse la apuesta si el cliente no puede retirar (por ejemplo, confirmar que el tiempo real está conectado y el botón de retiro habilitado antes de aceptar la apuesta). Investigar también por qué falta el botón (¿estado de ronda, reconexión, mensaje perdido?) y evaluar retiro automático o reembolso si la ronda arrancó sin poder retirar.
+- [ ] **Crash: límite al multiplicador / más probabilidad de explotar mientras sube.** Una ronda llegó a 486x y paga demasiado. Hoy la explosión sale de una distribución de cola larga (puede llegar hasta x1.000). Evaluar un tope más bajo (por ejemplo x100) y/o un riesgo de explosión que crezca con el multiplicador, sin romper la verificación provably fair ni el margen de la casa (ver `docs/juego-crash.md`).
 
 ### Ruleta
 - [ ] _(anotar)_
