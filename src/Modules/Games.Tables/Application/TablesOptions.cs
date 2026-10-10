@@ -8,7 +8,7 @@ namespace Casino.Modules.Games.Tables;
 public sealed class TablesOptions
 {
     /// <summary>Cuanto "piensa" un bot antes de jugar (para que se pueda seguir la partida).</summary>
-    public int BotThinkMilliseconds { get; set; } = 1_200;
+    public int BotThinkMilliseconds { get; set; } = 1_500;
 
     /// <summary>Cuanto puede esperar una mesa abierta sin iniciarse antes de cancelarse (se devuelven las fichas).</summary>
     public double OpenTableMinutes { get; set; } = 15;

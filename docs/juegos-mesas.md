@@ -25,5 +25,5 @@ La plataforma ya trae sus tests de integración (mesas, fichas, ausentes, privad
 - [Uno](juego-uno.md) · [Truco](juego-truco.md) · [Poker](juego-poker.md).
 
 ## Configuración (sección `Tables`)
-`BotThinkMilliseconds` (1.200), `OpenTableMinutes` (15), `ReservationSeconds` (3.600), `TickMilliseconds` (300) y `EngineEnabled` (true). **El motor tiene que correr en UNA sola
+`BotThinkMilliseconds` (1.500), `OpenTableMinutes` (15), `ReservationSeconds` (3.600), `TickMilliseconds` (300) y `EngineEnabled` (true). **El motor tiene que correr en UNA sola
 instancia** del servicio de juegos; las pruebas lo apagan y lo manejan a mano (`TableService.TickAsync`).

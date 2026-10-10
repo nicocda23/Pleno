@@ -30,7 +30,7 @@ export function decodeCard(card: number): TrucoCardInfo {
   return { suit, number, symbol: SUIT_SYMBOLS[suit], label: `${number} de ${SUIT_NAMES[suit]}` };
 }
 
-/** Cuanto vale la carta para ganar una baza (mas alto gana): 14 el 1 de espadas ... 1 los 4. Sirve para ordenar la mano. */
+/** Cuanto vale la carta para ganar una mano (mas alto gana): 14 el 1 de espadas ... 1 los 4. Sirve para ordenar la mano. */
 export function strengthOf(card: number): number {
   const { suit, number } = decodeCard(card);
   switch (number) {
@@ -62,7 +62,7 @@ const CALL_NAMES: Partial<Record<string, string>> = {
 const signed = (n: number): string => `+${n}`;
 
 /**
- * El hecho de la partida en una frase: "Jugador 2 cantó truco", "Bot 2 no quiso", "Ganó la baza Jugador 1", "Parda", "Ronda para Jugador 2: +2".
+ * El hecho de la partida en una frase: "Jugador 2 cantó truco", "Bot 2 no quiso", "Ganó la mano Jugador 1", "Parda", "Ronda para Jugador 2: +2".
  * `nameOf` da el nombre del asiento (viene del servidor: "Jugador 2" / "Bot 2").
  */
 export function eventText(event: TrucoEvent, nameOf: (seat: number) => string): string {
@@ -86,7 +86,7 @@ export function eventText(event: TrucoEvent, nameOf: (seat: number) => string): 
     case "mazo":
       return `${who} se fue al mazo`;
     case "baza":
-      return `Ganó la baza ${who}`;
+      return `Ganó la mano ${who}`;
     case "parda":
       return "Parda";
     case "envido_result": {
@@ -154,4 +154,27 @@ export function pendingText(pending: TrucoPending, nameOf: (seat: number) => str
   if (pending.kind === "truco") return `${who} cantó ${trucoLevelName(pending.level).toLowerCase()}: ¿quiero?`;
   const chain = pending.calls.map((c) => CALL_NAMES[c] ?? c).join(", ");
   return `${who} cantó ${chain || "envido"}: ¿quiero?`;
+}
+
+/** Los nombres de las tres manos de una ronda (en el Truco cada vuelta de cartas se llama "mano"; "es mano" es quien empieza la ronda). */
+export const MANO_NAMES = ["Primera mano", "Segunda mano", "Tercera mano"] as const;
+
+export interface PileSpot {
+  dx: number;
+  dy: number;
+  rot: number;
+}
+
+/** Cada mano cae un poco corrida (hacia abajo y a la derecha) de la anterior, asi la que se juega encima deja ver las de abajo. */
+const MANO_BASE = [{ x: -42, y: -20 }, { x: 2, y: 4 }, { x: 46, y: 28 }] as const;
+const JITTER = [-7, 5, -3, 8, 4, -6] as const;
+
+/**
+ * Donde cae la carta numero `index` (0 = la primera de la ronda) de la pila de la mesa. Las dos cartas de una mano van encimadas (la tuya mas abajo, la del rival mas arriba)
+ * y un poco "tiradas" (giradas distinto), como en una mesa de verdad; la segunda mano se juega ENCIMA de la primera, y la tercera de la segunda.
+ */
+export function pileSpot(index: number, mine: boolean): PileSpot {
+  const base = MANO_BASE[Math.min(Math.floor(index / 2), MANO_BASE.length - 1)]!;
+  const side = mine ? 1 : -1;
+  return { dx: base.x + side * 16, dy: base.y + side * 28, rot: JITTER[index % JITTER.length]! + side * 2 };
 }
