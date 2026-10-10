@@ -51,6 +51,23 @@
       }
     ]
   },
+  "identityProviders": [
+    {
+      "alias": "google",
+      "displayName": "Google",
+      "providerId": "google",
+      "enabled": "${GOOGLE_ENABLED:false}",
+      "trustEmail": false,
+      "storeToken": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "clientId": "${GOOGLE_CLIENT_ID:sin-configurar}",
+        "clientSecret": "${GOOGLE_CLIENT_SECRET:sin-configurar}",
+        "defaultScope": "openid email profile",
+        "syncMode": "IMPORT"
+      }
+    }
+  ],
   "clients": [
     {
       "clientId": "casino-web",

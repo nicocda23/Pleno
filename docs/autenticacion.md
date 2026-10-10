@@ -19,6 +19,27 @@ dotnet user-secrets set "Parameters:keycloak-admin-password" "<valor>" --project
 dotnet user-secrets set "Fairness:MasterKey" "<32 bytes aleatorios en base64>" --project src/Casino.GamesService
 ```
 
+## Entrar con Google (opcional)
+El realm trae el proveedor **Google** ya definido pero apagado. Para encenderlo hace falta una app OAuth propia (las credenciales son secretos):
+
+1. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crear una credencial **ID de cliente de OAuth** de tipo *Aplicacion web*.
+   Origen autorizado: `http://localhost:8080`. URI de redireccion autorizada: `http://localhost:8080/realms/casino/broker/google/endpoint`.
+2. Guardar el ID y el secreto con user-secrets (nunca en el repositorio):
+   ```
+   dotnet user-secrets set "Parameters:google-client-id" "<id>" --project src/Casino.AppHost
+   dotnet user-secrets set "Parameters:google-client-secret" "<secreto>" --project src/Casino.AppHost
+   ```
+3. Reiniciar con `aspire run`: la pantalla de login muestra **Google** junto al usuario y la contraseña. Quien entra con Google recibe el rol `player` igual que
+   quien se registra, y la API ve el mismo token de siempre (la identidad sigue saliendo del token).
+
+Sin esas credenciales el boton no aparece. En la nube las mismas dos credenciales van en Key Vault.
+
+> **Realm ya importado:** Keycloak solo importa el realm la primera vez. Si tu entorno local ya existia, borra el volumen `keycloak-data` (se pierden los usuarios de
+> prueba creados a mano) o cargalo en la consola: *Identity providers > Google* con el ID y el secreto.
+
+> **Cuentas repetidas:** si alguien ya se registro con usuario y contraseña y entra con Google con el mismo email, Keycloak le pide confirmar que es suya
+> (flujo *first broker login*) en vez de crear otro jugador o dejarle tomar la cuenta. El email de Google es PII: se enmascara en logs como cualquier otro.
+
 ## Usuarios de desarrollo del realm `casino`
 **Solo para desarrollo local.** Las contraseñas son triviales a proposito y el repositorio es publico: no las reutilices en ningun lado.
 
