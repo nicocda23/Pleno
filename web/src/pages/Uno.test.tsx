@@ -119,6 +119,25 @@ describe("Uno", () => {
     expect(actions(api)).toHaveLength(0);
   });
 
+  it("tells the player to tap the pile when there is nothing to play, and only then", async () => {
+    const scenario: Scenario = { table: view({ game: game({ playable: [] }) }) };
+    renderApp(<Uno />, { api: apiWith(scenario) });
+
+    expect(await screen.findByTestId("uno-draw-alert")).toHaveTextContent("tocá el mazo para robar");
+    expect(screen.getByRole("button", { name: "Robar carta" })).toHaveClass("uno-pile--call");
+
+    scenario.table = view({ game: game({ playable: [55], drawnCard: 55 }) });
+    await waitFor(() => expect(screen.queryByTestId("uno-draw-alert")).not.toBeInTheDocument(), { timeout: 2_500 });
+    expect(screen.getByRole("button", { name: "Robar carta" })).not.toHaveClass("uno-pile--call");
+  });
+
+  it("does not call for a draw when there is something to play", async () => {
+    renderApp(<Uno />, { api: apiWith({ table: view() }) });
+
+    await screen.findByRole("button", { name: "Robar carta" });
+    expect(screen.queryByTestId("uno-draw-alert")).not.toBeInTheDocument();
+  });
+
   it("draws from the pile, and shows Pasar only after drawing a playable card", async () => {
     const scenario: Scenario = { table: view({ game: game({ playable: [] }) }) };
     const api = apiWith(scenario);
