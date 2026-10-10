@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\src\Modules\Games.Slots\Casino.Modules.Games.Slots.csproj" />
     <ProjectReference Include="..\..\src\Modules\Games.Crash\Casino.Modules.Games.Crash.csproj" />
     <ProjectReference Include="..\..\src\Modules\Games.Blackjack\Casino.Modules.Games.Blackjack.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Games.Uno\Casino.Modules.Games.Uno.csproj" />
   </ItemGroup>
 
 </Project>

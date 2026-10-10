@@ -17,7 +17,7 @@ ningun jugador. Es la prueba de que el contrato de juegos (ADR 0008) alcanza par
 - **El servidor decide el multiplicador por su reloj.** Los tiempos salen de la hora de inicio y de la formula `e^(0,07 t)`, no de ticks; el cliente solo dibuja.
 - **Concurrencia:** el retiro del jugador y la explosion del motor compiten por la misma apuesta; se resuelve con concurrencia optimista (gana el primero) y cada apuesta se
   resuelve en su propia transaccion.
-- **La reserva de la Wallet tiene plazo propio.** `ReserveStake` gana un `TtlSeconds` opcional (acotado a 1 a 900 s): una ronda de Crash puede durar ~100 s y el plazo por
+- **La reserva de la Wallet tiene plazo propio.** `ReserveStake` gana un `TtlSeconds` opcional (acotado a 1 a 3.600 s desde el ADR 0012; al principio era 900): una ronda de Crash puede durar ~100 s y el plazo por
   defecto (60 s) liberaria la apuesta en medio del juego. Los demas juegos no cambian.
 - **Difusion en vivo a todos:** un mensaje generico `GameBroadcast` (el juego lo publica por RabbitMQ; el tiempo real lo reenvia por SignalR al grupo de todos los
   jugadores). La plataforma solo reenvia el JSON del juego, no lo interpreta; sirve para cualquier juego en vivo. El navegador dibuja con la hora del servidor y consulta el

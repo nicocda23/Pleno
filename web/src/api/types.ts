@@ -380,3 +380,106 @@ export interface BlackjackBet {
   failureReason: string | null;
   placedAt: string;
 }
+
+// Mesas entre jugadores (Uno y los que vengan): contrato comun de la plataforma de mesas.
+export type TableStatus = "Open" | "Playing" | "Finished" | "Cancelled";
+
+export interface TableRules {
+  minPlayers: number;
+  maxPlayers: number;
+  minBuyIn: number;
+  maxBuyIn: number;
+}
+
+/** Una mesa en el listado. `mine`: estoy sentado. */
+export interface TableSummary {
+  id: string;
+  gameId: string;
+  name: string;
+  buyIn: number;
+  maxPlayers: number;
+  players: number;
+  bots: number;
+  status: TableStatus;
+  mine: boolean;
+  isPrivate: boolean;
+  createdAt: string;
+}
+
+export interface CreateTableBody {
+  buyIn: number;
+  maxPlayers: number;
+  isPrivate?: boolean;
+  name?: string;
+}
+
+export interface TableCreated {
+  tableId: string;
+  /** Solo si la mesa es privada. */
+  joinCode: string | null;
+  alreadyCreated: boolean;
+}
+
+/** Un asiento tal como lo ve cualquiera: sin identidad ("Jugador 2", "Bot 3"). `ready`: las fichas ya estan confirmadas; `away`: ausente, lo juega un bot. */
+export interface TableSeat {
+  seat: number;
+  name: string;
+  isBot: boolean;
+  mine: boolean;
+  ready: boolean;
+  away: boolean;
+  payout: number | null;
+}
+
+/** La mesa vista por mi asiento. `game` es la vista propia de cada juego (null hasta que empieza). */
+export interface TableState<G = unknown> {
+  serverNow: string;
+  id: string;
+  gameId: string;
+  name: string;
+  status: TableStatus;
+  buyIn: number;
+  minPlayers: number;
+  maxPlayers: number;
+  isOwner: boolean;
+  isPrivate: boolean;
+  joinCode: string | null;
+  commitment: string;
+  serverSeed: string | null;
+  seats: TableSeat[];
+  mySeat: number | null;
+  turnSeat: number | null;
+  turnEndsAt: string | null;
+  game: G | null;
+  payouts: number[] | null;
+}
+
+// Uno
+export type UnoEventKind = "start" | "play" | "draw" | "pass" | "skipped" | "penalty";
+
+export interface UnoEvent {
+  seat: number;
+  kind: UnoEventKind;
+  card: number | null;
+  color: number | null;
+  count: number | null;
+}
+
+/** Lo que ve mi asiento: mi mano, lo jugable ahora, cuantas cartas tiene cada uno y la carta de arriba. */
+export interface UnoView {
+  you: number | null;
+  hand: number[];
+  playable: number[];
+  players: { seat: number; cards: number }[];
+  top: number;
+  topColor: number;
+  drawCount: number;
+  current: number;
+  direction: 1 | -1;
+  drawnCard: number | null;
+  winner: number;
+  events: UnoEvent[];
+}
+
+/** La jugada propia de Uno. */
+export type UnoAction = { type: "play"; card: number; color?: number } | { type: "draw" } | { type: "pass" };

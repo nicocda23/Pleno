@@ -33,7 +33,7 @@ Pago: `piso(apuesta x multiplicador / 100)` fichas, siempre un entero.
 ## Apuestas y la Wallet
 Es un juego mas de la plataforma ([contrato](juegos-contrato.md)): sigue el protocolo de rondas con la Wallet (reservar → resolver → liquidar → cerrar), con una
 particularidad: la reserva tiene que durar **hasta el final de la ronda aunque suba hasta el tope (~100 s)**, mucho mas que el plazo por defecto (60 s). Por eso la
-orden `ReserveStake` lleva un plazo propio (`TtlSeconds`, acotado a 1 a 900 s) que la Wallet respeta.
+orden `ReserveStake` lleva un plazo propio (`TtlSeconds`, acotado a 1 a 3.600 s) que la Wallet respeta.
 - Una apuesta que llega tarde (la reserva se confirma cuando ya no se aceptan apuestas) **se devuelve** tal cual.
 - Si el servicio se reinicia en medio de una ronda, la ronda se corta y **se devuelve lo apostado**: nadie pierde por una caida.
 - Una apuesta con fichas insuficientes se rechaza y no toma nada.

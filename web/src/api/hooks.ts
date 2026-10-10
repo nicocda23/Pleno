@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./ApiProvider";
 import { ApiError } from "./client";
-import type { Account, BlackjackBet, BlackjackTable, BlackjackTableState, CrashBet, CrashCashOut, CrashState, GameInfo, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
+import type { Account, CreateTableBody, TableCreated, TableRules, TableState, TableSummary, BlackjackBet, BlackjackTable, BlackjackTableState, CrashBet, CrashCashOut, CrashState, GameInfo, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
 
 export const queryKeys = {
   spinsAll: ["spins"] as const,
@@ -22,6 +22,10 @@ export const queryKeys = {
   crashBets: ["crash", "bets"] as const,
   blackjackTables: ["blackjack", "tables"] as const,
   blackjackTable: (tableId: string) => ["blackjack", "table", tableId] as const,
+  tablesOf: (gameId: string) => ["tables", gameId] as const,
+  tableList: (gameId: string) => ["tables", gameId, "list"] as const,
+  tableRules: (gameId: string) => ["tables", gameId, "rules"] as const,
+  table: (gameId: string, tableId: string) => ["tables", gameId, "table", tableId] as const,
   slotsSettings: ["admin", "slots-settings"] as const,
   slotsSettingsHistory: ["admin", "slots-settings-history"] as const,
   adminAccount: (userId: string) => ["admin", "account", userId] as const,
@@ -315,4 +319,108 @@ export function usePlaceBlackjackBet(tableId: string) {
 export function useBlackjackAction() {
   const api = useApi();
   return useMutation({ mutationFn: ({ betId, action }: { betId: string; action: "hit" | "stand" }) => api.post<BlackjackBet>(`/games/blackjack/bets/${betId}/${action}`) });
+}
+
+// ---- Mesas entre jugadores (Uno y los que vengan): los mismos endpoints para todo juego, bajo /games/{gameId} ----
+
+/** Las reglas basicas del juego (jugadores y entrada permitidos), para armar el formulario de crear mesa. */
+export function useTableRules(gameId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.tableRules(gameId), queryFn: () => api.get<TableRules>(`/games/${gameId}/rules`), staleTime: 5 * 60_000 });
+}
+
+/** Las mesas abiertas y las propias en curso. Se refresca cada 3 s (respaldo del aviso en vivo `tableChanged`). */
+export function useTables(gameId: string) {
+  const api = useApi();
+  return useQuery({ queryKey: queryKeys.tableList(gameId), queryFn: () => api.get<TableSummary[]>(`/games/${gameId}/tables`), refetchInterval: 3_000 });
+}
+
+/**
+ * Una mesa vista por MI asiento. Se consulta cada segundo (respaldo) y el aviso en vivo la refresca al instante. `offsetMs` es cuanto adelanta el
+ * reloj del servidor al del navegador, para las cuentas regresivas. Un 4xx (no existe, es privada) no se reintenta ni se sigue consultando.
+ */
+export function useTable<G = unknown>(gameId: string, tableId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: queryKeys.table(gameId, tableId ?? ""),
+    enabled: tableId !== null,
+    queryFn: async () => {
+      const sentAt = Date.now();
+      const state = await api.get<TableState<G>>(`/games/${gameId}/tables/${tableId}`);
+      const receivedAt = Date.now();
+      return { ...state, offsetMs: Date.parse(state.serverNow) - (sentAt + receivedAt) / 2 };
+    },
+    refetchInterval: (query) => (query.state.error instanceof ApiError && query.state.error.status >= 400 && query.state.error.status < 500 ? false : 1_000),
+  });
+}
+
+/** Crea una mesa. La clave de idempotencia la pone quien llama: reintentar el mismo envio no crea otra mesa. */
+export function useCreateTable(gameId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ body, idempotencyKey }: { body: CreateTableBody; idempotencyKey: string }) =>
+      api.post<TableCreated>(`/games/${gameId}/tables`, body, { "Idempotency-Key": idempotencyKey }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.tablesOf(gameId) }),
+  });
+}
+
+/** Sentarse en una mesa (con el codigo si es privada). */
+export function useJoinTable(gameId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tableId, code }: { tableId: string; code?: string }) => api.post<void>(`/games/${gameId}/tables/${tableId}/join`, code ? { code } : undefined),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.tablesOf(gameId) }),
+  });
+}
+
+/** Sentarse en una mesa privada con solo su codigo: el servidor dice cual es la mesa. */
+export function useJoinByCode(gameId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api.post<{ tableId: string }>(`/games/${gameId}/tables/join`, { code }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.tablesOf(gameId) }),
+  });
+}
+
+/** Irse de una mesa que todavia no empezo. */
+export function useLeaveTable(gameId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (tableId: string) => api.post<void>(`/games/${gameId}/tables/${tableId}/leave`),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.tablesOf(gameId) }),
+  });
+}
+
+/** Agregar o quitar un bot (solo el dueño, antes de empezar). */
+export function useTableBots(gameId: string, tableId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const settled = () => queryClient.invalidateQueries({ queryKey: queryKeys.tablesOf(gameId) });
+  const add = useMutation({ mutationFn: () => api.post<void>(`/games/${gameId}/tables/${tableId}/bots`), onSettled: settled });
+  const remove = useMutation({ mutationFn: () => api.delete<void>(`/games/${gameId}/tables/${tableId}/bots`), onSettled: settled });
+  return { add, remove };
+}
+
+/** Empezar la partida (solo el dueño). */
+export function useStartTable(gameId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (tableId: string) => api.post<void>(`/games/${gameId}/tables/${tableId}/start`),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.tablesOf(gameId) }),
+  });
+}
+
+/** Una jugada propia del juego (el cuerpo lo define cada juego). */
+export function useTableAction<A = unknown>(gameId: string, tableId: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (action: A) => api.post<void>(`/games/${gameId}/tables/${tableId}/action`, action),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.table(gameId, tableId) }),
+  });
 }

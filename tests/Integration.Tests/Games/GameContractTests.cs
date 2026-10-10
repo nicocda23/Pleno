@@ -50,7 +50,8 @@ public sealed class GameContractTests(PostgresFixture db, RabbitMqFixture rabbit
         var catalog = await player.GetFromJsonAsync<JsonElement>("/games");
 
         var cards = catalog.EnumerateArray().ToDictionary(c => c.GetProperty("id").GetString()!);
-        Assert.Equal(["blackjack", "crash", "roulette", "slots"], cards.Keys.Order());
+        Assert.Equal(["blackjack", "crash", "roulette", "slots", "uno"], cards.Keys.Order());
+        Assert.Equal("/uno", cards["uno"].GetProperty("route").GetString());
         Assert.Equal("/blackjack", cards["blackjack"].GetProperty("route").GetString());
         Assert.Equal("/crash", cards["crash"].GetProperty("route").GetString());
         Assert.Equal("/ruleta", cards["roulette"].GetProperty("route").GetString());
@@ -121,12 +122,12 @@ public sealed class GameContractTests(PostgresFixture db, RabbitMqFixture rabbit
     [Fact]
     public async Task Enabling_a_game_that_does_not_exist_stops_the_service_at_startup()
     {
-        using var games = TestAuth.StartGamesHost(db, rabbit, customize: b => b.UseSetting("Games:Enabled:0", "poker"));
+        using var games = TestAuth.StartGamesHost(db, rabbit, customize: b => b.UseSetting("Games:Enabled:0", "no-existe"));
         _disposables.Add(games);
 
         var ex = await Assert.ThrowsAnyAsync<Exception>(() => Task.Run(() => games.CreateClient()));
 
-        Assert.Contains("poker", ex.ToString());
+        Assert.Contains("no-existe", ex.ToString());
     }
 
     [Fact]

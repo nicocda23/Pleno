@@ -136,7 +136,8 @@ Seis fases de 1 a 2 semanas cada una; la fase 1 sola ya deja material sólido pa
 - [ ] Agente de soporte que consulta historial y explica jugadas
 - [x] Crash: juego en vivo con ronda compartida y provably fair por ronda (ADR 0009, `docs/juego-crash.md`)
 - [x] Blackjack: primer juego de mesas (mesas fijas contra el crupier, varios jugadores por mesa, mazo provably fair; ADR 0011, `docs/juego-blackjack.md`)
-- [ ] Mas juegos de mesa (Truco/Uno entre jugadores con mesas creadas por jugadores, Poker): sobre el modelo de mesa del ADR 0010
+- [x] Plataforma de mesas entre jugadores (mesas de jugador publicas y privadas, bots, turnos, fichas en la Wallet) y Uno como primer juego (ADR 0012, `docs/juegos-mesas.md`, `docs/juego-uno.md`)
+- [ ] Truco y Poker sobre la plataforma de mesas entre jugadores
 - [ ] Torneos con leaderboard en Redis
 - [ ] Deploy en Azure Container Apps con Bicep
 - [ ] Backoffice con ajustes manuales y doble aprobación
