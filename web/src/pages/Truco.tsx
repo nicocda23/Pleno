@@ -3,6 +3,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { queryKeys, useTableAction } from "../api/hooks";
 import type { TrucoAction, TrucoActionType, TrucoView } from "../api/types";
 import { Confetti } from "../components/Confetti";
+import { SpanishCardFace } from "../components/SpanishCard";
 import { TablesLobby, type LiveTable } from "../components/TablesLobby";
 import { sha256Hex } from "../lib/crash";
 import { formatChips } from "../lib/format";
@@ -49,13 +50,7 @@ function TrucoCard({ card, label, onClick, disabled, playable, dimmed }: { card:
   const info = decodeCard(card);
   const style = { "--tru-suit": SUIT_CSS[info.suit] } as CSSProperties;
   const classes = ["tru-card", playable ? "tru-card--playable" : "", dimmed ? "tru-card--dim" : ""].filter(Boolean).join(" ");
-  const face = (
-    <>
-      <span className="tru-card__corner" aria-hidden="true">{info.number}</span>
-      <span className="tru-card__symbol" aria-hidden="true">{info.symbol}</span>
-      <span className="tru-card__number" aria-hidden="true">{info.number}</span>
-    </>
-  );
+  const face = <SpanishCardFace suit={info.suit} number={info.number} />;
   if (onClick) {
     return (
       <button type="button" className={classes} style={style} aria-label={label ?? info.label} disabled={disabled} onClick={onClick}>
