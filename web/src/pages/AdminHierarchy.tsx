@@ -69,7 +69,8 @@ export function AdminHierarchy() {
                 <ul className="admin-users">
                   {group.map((n) => (
                     <li key={n.userId} className="admin-user">
-                      <span className="admin-user__id">{shortId(n.userId)}</span>
+                      <span className="admin-user__id">{n.displayName ?? shortId(n.userId)}</span>
+                      {n.displayName && <span className="muted mono">{shortId(n.userId)}</span>}
                       <span className="muted">{n.parentUserId ? `depende de ${shortId(n.parentUserId)}` : "sin padre"}</span>
                     </li>
                   ))}
@@ -105,7 +106,7 @@ export function AdminHierarchy() {
                 <select value={parentUserId} onChange={(e) => setParentUserId(e.target.value)}>
                   <option value="">Elegí…</option>
                   {parents.map((p) => (
-                    <option key={p.userId} value={p.userId}>{shortId(p.userId)}</option>
+                    <option key={p.userId} value={p.userId}>{p.displayName ? `${p.displayName} (${shortId(p.userId)})` : shortId(p.userId)}</option>
                   ))}
                 </select>
               </label>

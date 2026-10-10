@@ -30,7 +30,7 @@ fichas lleva `IdempotencyKey`, la identidad sale del token y la PII no va a logs
 ## Consecuencias
 - La Wallet gana una operacion (transferencia) y, con ella, el riesgo de dos cuentas en una transaccion: probado con concurrencia cruzada (30 transferencias a la vez en ambos sentidos: la suma de fichas no cambia), idempotencia
   y saldos que cierran. Las cuentas de cajeros y jefes reciben tambien las fichas de bienvenida como cualquier jugador (si molesta, se saca para esos roles).
-- Hoy las pantallas muestran ids abreviados de usuario, no nombres (el nombre sale del token y no se guarda): queda para despues enriquecerlo.
+- **Nombres, con minimo de datos:** el cajero ve el nombre de usuario de su gente (`HierarchyNode.DisplayName`, tomado del token cuando esa persona usa la API) y de nadie mas; solo se guarda de quienes estan en el arbol y no se muestra fuera de la jurisdiccion. Hasta que la persona usa la app se ve el id abreviado.
 - Un cajero sin fichas no puede cargar: es una restriccion buscada, pero necesita una pantalla para que backoffice le recargue.
 - La jerarquia de un solo padre es simple pero rigida: cambiar a un jugador de cajero es una operacion de backoffice auditada; subcajeros (niveles) quedan para despues.
 - Esto es un juego con fichas ficticias. Si algun dia las fichas tuvieran valor real, habria que revisar aspectos legales y de prevencion de lavado antes de seguir.

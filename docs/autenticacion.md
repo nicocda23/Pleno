@@ -74,6 +74,8 @@ Dos roles mas ([ADR 0014](adr/0014-cajeros-jerarquia-y-cobros.md)): **`cashier`*
 - **Las fichas salen del saldo de quien carga** (transferencia, nunca emision). El backoffice le acredita fichas al jefe (`/backoffice/wallet/users/{id}/credit`); el jefe se las carga a sus cajeros y estos a sus jugadores.
   El jefe solo puede cargar a **sus cajeros** y el cajero solo a **sus jugadores**; cualquier otro destino responde 403.
 - Pantalla del cajero: `/cajero` (aparece en el menu para quien tenga el rol).
+- **Nombres:** el cajero ve el **nombre de usuario** (`preferred_username`) de **su** gente para distinguirla, y de nadie mas. El nombre se guarda solo de quienes estan en el arbol (en su nodo) y se renueva cuando esa persona usa la API; hasta entonces
+  se ve el id abreviado. Una carga a alguien que ya no esta a cargo del cajero deja de mostrar su nombre. Es dato personal: no va a logs, trazas ni metricas. Ojo: con el login de Google el nombre de usuario puede ser el email.
 - Cada carga queda en la auditoria (`ChipsTransferred`: quien, a quien, cuanto, cuando; solo ids) y en el extracto de los dos como "Fichas recibidas" / "Fichas enviadas".
 - Para dar el rol a un usuario que ya existe: consola de Keycloak (Users > usuario > Role mapping > `cashier` o `head_cashier`).
 

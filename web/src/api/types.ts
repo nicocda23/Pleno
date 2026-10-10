@@ -26,6 +26,8 @@ export type HierarchyLevel = "player" | "cashier" | "head_cashier";
 export interface HierarchyNode {
   userId: string;
   level: HierarchyLevel;
+  /** Nombre de usuario (si ya lo usó la API estando en el árbol). */
+  displayName?: string | null;
   parentUserId: string | null;
   updatedAt: string;
 }
@@ -41,6 +43,8 @@ export interface CashierMe {
 export interface JurisdictionMember {
   userId: string;
   level: HierarchyLevel;
+  /** Nombre de usuario para distinguirlo; null hasta que use la app. Solo lo ve quien lo tiene a cargo. */
+  displayName?: string | null;
   available: number | null;
   reserved: number | null;
 }
@@ -48,6 +52,8 @@ export interface JurisdictionMember {
 /** Una carga que hice. */
 export interface CashierTransfer {
   targetUserId: string;
+  /** Solo viene si el destinatario sigue a mi cargo. */
+  targetName?: string | null;
   amount: number;
   transactionId: string;
   occurredAt: string;

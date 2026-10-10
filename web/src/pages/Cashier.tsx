@@ -11,6 +11,9 @@ export const MAX_LOAD = 1_000_000;
 
 const shortId = (id: string) => `${id.slice(0, 8)}…${id.slice(-4)}`;
 
+/** Como se muestra a una persona: su nombre de usuario si se conoce (con el id abreviado aparte) o, si no, el id abreviado. */
+const personName = (name: string | null | undefined, id: string) => name ?? shortId(id);
+
 export const LEVEL_NAMES: Record<HierarchyLevel, string> = { player: "Jugador", cashier: "Cajero", head_cashier: "Jefe de cajeros" };
 
 /** Cajero y jefe de cajeros: cargan fichas desde su PROPIO saldo a la gente de su jurisdiccion (el jefe a sus cajeros, el cajero a sus jugadores). */
@@ -83,7 +86,8 @@ export function Cashier() {
             {members.data?.map((m) => (
               <li key={m.userId}>
                 <button type="button" className={`admin-user ${selected === m.userId ? "admin-user--on" : ""}`} aria-pressed={selected === m.userId} onClick={() => setSelected(m.userId)}>
-                  <span className="admin-user__id">{shortId(m.userId)}</span>
+                  <span className="admin-user__id">{personName(m.displayName, m.userId)}</span>
+                  {m.displayName && <span className="muted mono">{shortId(m.userId)}</span>}
                   <span className="muted">{m.available === null ? "sin cuenta todavía" : `${formatChips(m.available)} fichas`}</span>
                 </button>
               </li>
@@ -131,7 +135,7 @@ export function Cashier() {
                 {transfers.data.map((t) => (
                   <tr key={t.transactionId}>
                     <td>{formatDateTime(t.occurredAt)}</td>
-                    <td className="mono">{shortId(t.targetUserId)}</td>
+                    <td className={t.targetName ? undefined : "mono"}>{personName(t.targetName, t.targetUserId)}</td>
                     <td className="num">{formatChips(t.amount)}</td>
                   </tr>
                 ))}
