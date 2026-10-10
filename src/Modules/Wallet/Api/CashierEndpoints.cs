@@ -10,7 +10,11 @@ namespace Casino.Modules.Wallet.Api;
 
 public sealed record LoadChipsRequest(Guid ToUserId, long Amount);
 
-public sealed record CashierMeResponse(Guid UserId, string Level, Guid? ParentUserId);
+/// <summary><paramref name="CommissionPermille"/>: lo que cobra por cada carga (milesimas; 20 = 2 %).</summary>
+public sealed record CashierMeResponse(Guid UserId, string Level, Guid? ParentUserId, int CommissionPermille);
+
+/// <summary><paramref name="Commission"/>: lo que la casa le pago a quien cargo por esta carga (0 si no cobra o llego al tope).</summary>
+public sealed record LoadChipsResponse(Guid TransactionId, bool IsDuplicate, long Commission);
 
 public sealed record JurisdictionMemberResponse(Guid UserId, string Level, string? DisplayName, long? Available, long? Reserved);
 
@@ -39,7 +43,7 @@ internal static class CashierEndpoints
             var node = await cashiers.GetNodeAsync(userId, ct);
             return node is null
                 ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: nameof(WalletError.NotInJurisdiction), detail: "Todavia no te asignaron un lugar en la jerarquia de cajeros.")
-                : Results.Ok(new CashierMeResponse(userId, CashierService.NameOf(node.Level), node.ParentUserId));
+                : Results.Ok(new CashierMeResponse(userId, CashierService.NameOf(node.Level), node.ParentUserId, cashiers.CommissionPermilleFor(node.Level)));
         });
 
         // La gente de mi jurisdiccion directa, con su saldo.
@@ -62,8 +66,8 @@ internal static class CashierEndpoints
             }
 
             var roles = http.User.FindAll(System.Security.Claims.ClaimTypes.Role).Select(c => c.Value);
-            var outcome = await cashiers.LoadChipsAsync(http.User.GetUserId(), roles, body.ToUserId, body.Amount, key, ct);
-            return Results.Ok(new OperationResponse(outcome.TransactionId, outcome.IsDuplicate));
+            var result = await cashiers.LoadChipsAsync(http.User.GetUserId(), roles, body.ToUserId, body.Amount, key, ct);
+            return Results.Ok(new LoadChipsResponse(result.Outcome.TransactionId, result.Outcome.IsDuplicate, result.Commission));
         });
 
         // Mis ultimas cargas.

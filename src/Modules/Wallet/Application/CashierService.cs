@@ -1,7 +1,11 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using Casino.BuildingBlocks;
 using Casino.Modules.Wallet.Domain;
+using JasperFx;
 using Marten;
+using Marten.Exceptions;
 
 namespace Casino.Modules.Wallet.Application;
 
@@ -40,14 +44,20 @@ public sealed class HierarchyNode
 }
 
 /// <summary>Un jugador (o cajero) de la jurisdiccion de alguien, con su saldo si ya tiene cuenta.</summary>
+/// <summary>Lo que dejo una carga: la transaccion, si era un reintento y la comision que cobro quien cargo.</summary>
+public sealed record LoadResult(OperationOutcome Outcome, long Commission);
+
 public sealed record JurisdictionMember(Guid UserId, HierarchyLevel Level, string? DisplayName, long? Available, long? Reserved);
 
 /// <summary>
 /// Cajeros y jefes de cajeros: arman el arbol de jurisdicciones (lo decide el backoffice) y cargan fichas hacia abajo (jefe → cajero → jugador) desde su
 /// PROPIO saldo, por transferencia: las fichas nunca se crean, solo se mueven. La Wallet garantiza la contabilidad; aca vive la regla de quien puede cargarle a quien.
 /// </summary>
-public sealed class CashierService(IDocumentStore store, WalletService wallet, BackofficeAudit audit, TimeProvider clock)
+public sealed class CashierService(IDocumentStore store, WalletService wallet, BackofficeAudit audit, TimeProvider clock, CashierOptions options)
 {
+    // Serializa el calculo de la comision de una misma persona dentro de esta instancia (que dos cargas a la vez no pasen el tope diario).
+    private readonly SemaphoreSlim[] _commissionGates = [.. Enumerable.Range(0, 64).Select(_ => new SemaphoreSlim(1, 1))];
+
     private const int MaxDisplayNameLength = 60;
 
     // Ultimo nombre guardado de cada usuario (en esta instancia): evita ir a la base en cada pedido cuando el nombre no cambio.
@@ -233,7 +243,7 @@ public sealed class CashierService(IDocumentStore store, WalletService wallet, B
     /// Carga fichas desde el saldo de quien llama hacia alguien de su jurisdiccion DIRECTA: el jefe solo a sus cajeros y el cajero solo a sus jugadores.
     /// El nivel de quien llama sale de su token (rol) y tiene que coincidir con el que le asigno el backoffice en el arbol.
     /// </summary>
-    public async Task<OperationOutcome> LoadChipsAsync(Guid actorUserId, IEnumerable<string> actorRoles, Guid targetUserId, long amount, string idempotencyKey, CancellationToken ct = default)
+    public async Task<LoadResult> LoadChipsAsync(Guid actorUserId, IEnumerable<string> actorRoles, Guid targetUserId, long amount, string idempotencyKey, CancellationToken ct = default)
     {
         var actorLevel = LevelOfRoles(actorRoles)
             ?? throw new WalletDomainException(WalletError.NotInJurisdiction, "Tu usuario no es cajero ni jefe de cajeros.");
@@ -253,8 +263,87 @@ public sealed class CashierService(IDocumentStore store, WalletService wallet, B
         }
 
         var outcome = await wallet.TransferAsync(actorUserId, targetUserId, idempotencyKey, amount, ct);
-        // Tambien si fue un duplicado: asi un reintento completa la anotacion si fallo la primera vez.
+        // Tambien si fue un duplicado: asi un reintento completa la anotacion y la comision si fallo la primera vez.
         await audit.RecordTransferAsync(actorUserId, targetUserId, PlayerIds.WalletAccountFor(targetUserId), amount, idempotencyKey, outcome.TransactionId, ct);
-        return outcome;
+        var commission = await PayCommissionAsync(actorUserId, actorLevel, targetUserId, amount, idempotencyKey, outcome.TransactionId, ct);
+        return new LoadResult(outcome, commission);
+    }
+
+    /// <summary>La comision (en milesimas) que cobra hoy un nivel; el front la muestra.</summary>
+    public int CommissionPermilleFor(HierarchyLevel level) => options.PermilleFor(level);
+
+    /// <summary>
+    /// Paga la comision de una carga: la casa le acredita a quien cargo un porcentaje (con tope por carga y por dia). La decision se guarda ANTES de pagar, asi un reintento
+    /// (duplicado de la carga, caida entre la transferencia y el pago) paga exactamente lo mismo y nunca dos veces: el credito es idempotente por esa misma decision.
+    /// </summary>
+    private async Task<long> PayCommissionAsync(Guid actorUserId, HierarchyLevel actorLevel, Guid targetUserId, long loaded, string loadKey, Guid transferTransactionId, CancellationToken ct)
+    {
+        var id = CommissionRecord.BuildId(actorUserId, loadKey);
+        var gate = _commissionGates[(actorUserId.GetHashCode() & int.MaxValue) % _commissionGates.Length];
+        await gate.WaitAsync(ct);
+        try
+        {
+            CommissionRecord? record;
+            await using (var read = store.QuerySession())
+            {
+                record = await read.LoadAsync<CommissionRecord>(id, ct);
+            }
+
+            if (record is null)
+            {
+                var now = clock.GetUtcNow();
+                var dayStart = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero);
+                long today;
+                await using (var read = store.QuerySession())
+                {
+                    var todays = read.Query<CommissionRecord>().Where(c => c.ActorUserId == actorUserId && c.OccurredAt >= dayStart);
+                    today = await todays.CountAsync(ct) == 0 ? 0 : await todays.SumAsync(c => c.Amount, ct);
+                }
+
+                record = new CommissionRecord
+                {
+                    Id = id,
+                    ActorUserId = actorUserId,
+                    TargetUserId = targetUserId,
+                    LoadedAmount = loaded,
+                    Amount = CashierCommissionMath.Compute(loaded, options.PermilleFor(actorLevel), options.MaxCommissionPerLoad, options.MaxCommissionPerDay - today),
+                    TransferTransactionId = transferTransactionId,
+                    OccurredAt = now,
+                };
+                try
+                {
+                    await using var write = store.LightweightSession();
+                    write.Insert(record);
+                    await write.SaveChangesAsync(ct);
+                }
+                catch (Exception ex) when (ex is DocumentAlreadyExistsException || ex.InnerException is DocumentAlreadyExistsException)
+                {
+                    await using var again = store.QuerySession();
+                    record = await again.LoadAsync<CommissionRecord>(id, ct) ?? record; // otra instancia decidio primero: vale esa
+                }
+            }
+
+            if (record.Amount > 0)
+            {
+                var creditKey = "commission:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id)));
+                await wallet.CreditAsync(PlayerIds.WalletAccountFor(actorUserId), creditKey, record.Amount, ct);
+            }
+
+            return record.Amount;
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    /// <summary>Las comisiones que pago la casa, las mas recientes primero, con el total emitido (backoffice).</summary>
+    public async Task<(IReadOnlyList<CommissionRecord> Items, long Total)> ListCommissionsAsync(int limit, CancellationToken ct = default)
+    {
+        await using var session = store.QuerySession();
+        var items = await session.Query<CommissionRecord>().OrderByDescending(c => c.OccurredAt).Take(limit).ToListAsync(ct);
+        var all = session.Query<CommissionRecord>();
+        var total = await all.CountAsync(ct) == 0 ? 0 : await all.SumAsync(c => c.Amount, ct);
+        return (items, total);
     }
 }

@@ -9,6 +9,10 @@ namespace Casino.Modules.Wallet.Api;
 
 public sealed record CreditRequest(long Amount);
 
+public sealed record CommissionResponse(Guid ActorUserId, Guid TargetUserId, long LoadedAmount, long Amount, Guid TransactionId, DateTimeOffset OccurredAt);
+
+public sealed record CommissionsResponse(IReadOnlyList<CommissionResponse> Items, long TotalPaid);
+
 public sealed record HierarchyAssignRequest(string? Level, Guid? ParentUserId);
 
 public sealed record HierarchyNodeResponse(Guid UserId, string Level, string? DisplayName, Guid? ParentUserId, DateTimeOffset UpdatedAt);
@@ -115,6 +119,14 @@ internal static class WalletEndpoints
 
             var node = await cashiers.AssignAsync(context.User.GetUserId(), userId, level, body.ParentUserId, ct);
             return Results.Ok(new HierarchyNodeResponse(node.Id, CashierService.NameOf(node.Level), node.DisplayName, node.ParentUserId, node.UpdatedAt));
+        });
+
+        // Comisiones que pago la casa (fichas emitidas por incentivo), con el total.
+        backoffice.MapGet("/commissions", async (int? limit, CashierService cashiers, CancellationToken ct) =>
+        {
+            var (items, total) = await cashiers.ListCommissionsAsync(Math.Clamp(limit ?? 50, 1, 200), ct);
+            return Results.Ok(new CommissionsResponse(
+                [.. items.Select(c => new CommissionResponse(c.ActorUserId, c.TargetUserId, c.LoadedAmount, c.Amount, c.TransferTransactionId, c.OccurredAt))], total));
         });
 
         // Registro de auditoria: quien cargo fichas, a quien y cuando.
