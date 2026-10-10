@@ -28,6 +28,9 @@ public sealed class SlotsSpin
     /// <summary>Simbolo de cada rodillo (por nombre, para que el historial sobreviva a cambios de la tabla).</summary>
     public List<string> Reels { get; set; } = [];
 
+    /// <summary>Todos los pasos del giro (el primero es el giro inicial, los demas las cascadas). Vacio en giros anteriores a las cascadas.</summary>
+    public List<SlotsStep> Steps { get; set; } = [];
+
     /// <summary>Version de la tabla de pagos con la que se sorteo (0 = la de la configuracion). Permite recalcular el giro mas adelante.</summary>
     public int? PaytableVersion { get; set; }
 
@@ -47,7 +50,7 @@ public sealed class SlotsSpin
 
     public bool IsClosed => Status is RoundStatus.Settled or RoundStatus.Rejected or RoundStatus.Voided;
 
-    public bool MarkResolved(IEnumerable<string> reels, long multiplier, long payout, int paytableVersion = 0)
+    public bool MarkResolved(IEnumerable<string> reels, long multiplier, long payout, int paytableVersion = 0, IEnumerable<SlotsStep>? steps = null)
     {
         if (Status != RoundStatus.Placed)
         {
@@ -56,6 +59,7 @@ public sealed class SlotsSpin
 
         Status = RoundStatus.Resolved;
         Reels = [.. reels];
+        Steps = [.. steps ?? []];
         Multiplier = multiplier;
         Payout = payout;
         PaytableVersion = paytableVersion;

@@ -116,7 +116,7 @@ public sealed partial class SlotsService(
         var inputs = await fairness.GetDrawInputsAsync(spin.UserId, spin.Id, ct);
         var current = await settings.GetCurrentAsync(ct);
         var outcome = SlotsGame.Play(current.Paytable, spin.Stake, inputs.ServerSeed, inputs.ClientSeed, inputs.Nonce);
-        spin.MarkResolved(outcome.Reels, outcome.Multiplier, outcome.Payout, current.Version);
+        spin.MarkResolved(outcome.Reels, outcome.Multiplier, outcome.Payout, current.Version, outcome.Steps);
         session.Store(spin);
 
         // El resultado y el aviso a la Wallet salen en la misma transaccion: no puede quedar sorteado sin avisar.

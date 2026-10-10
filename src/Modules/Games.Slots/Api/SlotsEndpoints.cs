@@ -15,6 +15,7 @@ public sealed record SpinResponse(
     RoundStatus Status,
     long Stake,
     IReadOnlyList<string> Reels,
+    IReadOnlyList<SlotsStep> Steps,
     long? Multiplier,
     long? Payout,
     Guid PairId,
@@ -31,7 +32,9 @@ public sealed record PaytableResponse(
     long MaxStake,
     int TotalWeight,
     double ReturnToPlayerPercent,
-    double HitRatePercent);
+    double HitRatePercent,
+    IReadOnlyList<int> CascadeMultipliers,
+    long CascadeMinPay);
 
 internal static class SlotsEndpoints
 {
@@ -50,7 +53,8 @@ internal static class SlotsEndpoints
             var table = (await slots.GetSettingsAsync(ct)).Paytable;
             return Results.Ok(new PaytableResponse(
                 SlotsPaytable.ReelCount, table.Symbols, table.LeadingPays, table.MinStake, table.MaxStake,
-                table.TotalWeight, Math.Round(table.ReturnToPlayerPercent, 2), Math.Round(table.HitRatePercent, 2)));
+                table.TotalWeight, Math.Round(table.ReturnToPlayerPercent, 2), Math.Round(table.HitRatePercent, 2),
+                SlotsPaytable.CascadeMultipliers, SlotsPaytable.CascadeMinPay));
         });
 
         // Como en la ruleta: responde 202 y el giro se consulta por su BetId. El servidor asigna el nonce.
@@ -81,5 +85,5 @@ internal static class SlotsEndpoints
     }
 
     private static SpinResponse ToResponse(SlotsSpin spin) => new(
-        spin.Id, spin.Status, spin.Stake, spin.Reels, spin.Multiplier, spin.Payout, spin.PairId, spin.Nonce, spin.FailureReason, spin.PlacedAt, spin.PaytableVersion);
+        spin.Id, spin.Status, spin.Stake, spin.Reels, spin.Steps, spin.Multiplier, spin.Payout, spin.PairId, spin.Nonce, spin.FailureReason, spin.PlacedAt, spin.PaytableVersion);
 }
