@@ -158,11 +158,11 @@ export function Crash() {
           <h2 id="apuesta" className="section-title">Tu apuesta</h2>
           <StakePicker stake={stake} onChange={setStake} chips={CHIPS} min={data?.minStake ?? 1} max={data?.maxStake ?? 10_000} defaultStake={10} disabled={myBetInThisRound} />
           <label className="field">
-            <span>Retiro automático en (opcional, de 1,01 a 1000)</span>
+            <span>Retiro automático en (opcional, de 1,01 a 100)</span>
             <input type="text" inputMode="decimal" placeholder="por ejemplo 2,5" value={auto} disabled={myBetInThisRound} aria-invalid={!autoValid} onChange={(e) => setAuto(e.target.value)} />
           </label>
 
-          {!autoValid && <p className="notice notice--error" role="alert">El retiro automático tiene que estar entre 1,01 y 1000.</p>}
+          {!autoValid && <p className="notice notice--error" role="alert">El retiro automático tiene que estar entre 1,01 y 100.</p>}
           {stake > balance.available && balance.ready && stakeValid && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa apuesta.</p>}
           {!live && view.phase === "betting" && !myBetInThisRound && <p className="notice notice--error" role="alert">Sin conexión en vivo no se puede apostar: reconectando…</p>}
           {error && <p className="notice notice--error" role="alert">{error}</p>}

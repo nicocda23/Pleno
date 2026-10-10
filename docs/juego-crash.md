@@ -21,7 +21,7 @@ la semilla y cualquiera puede recalcular el punto:
 mac    = HMAC-SHA256(clave = serverSeed en UTF-8, mensaje = "crash:" + roundId sin guiones)
 r      = (primeros 7 bytes de mac, como entero big-endian) >> 4        // 52 bits: uniforme en [0, 2^52)
 punto  = piso( 100 * (1000 - ventaja) * 2^52 / (1000 * (2^52 - r)) )   // en centesimas; ventaja en milesimas (por defecto 30 = 3 %)
-punto  = min(max(punto, 100), 100000)                                  // entre x1,00 (explosion instantanea) y x1.000
+punto  = min(max(punto, 100), 10000)                                   // entre x1,00 (explosion instantanea) y x100 (tope)
 ```
 
 Todo con enteros (sin decimales). Con la ventaja del 3 %, un jugador que siempre retira en el mismo multiplicador recupera en promedio ~97 %
@@ -32,7 +32,7 @@ Pago: `piso(apuesta x multiplicador / 100)` fichas, siempre un entero.
 
 ## Apuestas y la Wallet
 Es un juego mas de la plataforma ([contrato](juegos-contrato.md)): sigue el protocolo de rondas con la Wallet (reservar → resolver → liquidar → cerrar), con una
-particularidad: la reserva tiene que durar **hasta el final de la ronda aunque suba hasta el tope (~100 s)**, mucho mas que el plazo por defecto (60 s). Por eso la
+particularidad: la reserva tiene que durar **hasta el final de la ronda aunque suba hasta el tope (~66 s)**, mucho mas que el plazo por defecto (60 s). Por eso la
 orden `ReserveStake` lleva un plazo propio (`TtlSeconds`, acotado a 1 a 3.600 s) que la Wallet respeta.
 - Una apuesta que llega tarde (la reserva se confirma cuando ya no se aceptan apuestas) **se devuelve** tal cual.
 - Si el servicio se reinicia en medio de una ronda, la ronda se corta y **se devuelve lo apostado**: nadie pierde por una caida.

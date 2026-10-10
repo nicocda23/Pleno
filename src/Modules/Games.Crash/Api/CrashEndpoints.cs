@@ -76,7 +76,7 @@ internal static class CrashEndpoints
             {
                 if (multiplier is <= 1m or > 1000m)
                 {
-                    throw new GamesDomainException(GamesError.InvalidBet, "El retiro automatico va de x1,01 a x1.000,00.");
+                    throw new GamesDomainException(GamesError.InvalidBet, "El retiro automatico va de x1,01 a x100,00.");
                 }
 
                 auto = (long)Math.Floor(multiplier * 100m);

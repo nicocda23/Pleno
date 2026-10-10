@@ -12,8 +12,8 @@ public static class CrashMath
     /// <summary>x1,00 en centesimas.</summary>
     public const long OneX = 100;
 
-    /// <summary>Tope del punto de explosion: x1.000,00. Acota el pago maximo y la duracion de una ronda.</summary>
-    public const long MaxMultiplier = 100_000;
+    /// <summary>Tope del punto de explosion: x100,00. Acota el pago maximo y la duracion de una ronda.</summary>
+    public const long MaxMultiplier = 10_000;
 
     /// <summary>Ventaja de la casa por defecto, en milesimas: 30 = 3 %. Un jugador que siempre retira en el mismo multiplicador recupera ~97 %.</summary>
     public const int DefaultEdgePermille = 30;
@@ -26,7 +26,7 @@ public static class CrashMath
     /// <summary>
     /// El punto en el que explota la ronda. Es una funcion de la server seed y del id de la ronda: HMAC-SHA256 (clave = la seed en UTF-8, mensaje
     /// "crash:{roundId sin guiones}"), se toman 52 bits (r) y el punto es piso(100 * (1000 - ventaja) * 2^52 / (1000 * (2^52 - r))), con minimo x1,00
-    /// (explosion instantanea, con probabilidad igual a la ventaja) y tope x1.000.
+    /// (explosion instantanea, con probabilidad igual a la ventaja) y tope x100.
     /// </summary>
     public static long CrashPoint(string serverSeed, Guid roundId, int edgePermille = DefaultEdgePermille)
     {
