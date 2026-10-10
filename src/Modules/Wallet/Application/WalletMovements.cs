@@ -28,8 +28,9 @@ public enum MovementKind
 /// <summary>
 /// Un movimiento del saldo disponible. <paramref name="Delta"/> es con signo (negativo = salen fichas) y
 /// <paramref name="BalanceAfter"/> es lo disponible justo despues. <paramref name="Version"/> ordena y sirve de cursor.
+/// <paramref name="GameId"/> es el juego de una apuesta, su premio o su devolucion (null si no aplica o la apuesta es anterior a que se guardara).
 /// </summary>
-public sealed record Movement(long Version, DateTimeOffset At, MovementKind Kind, long Delta, long BalanceAfter, Guid? Reference);
+public sealed record Movement(long Version, DateTimeOffset At, MovementKind Kind, long Delta, long BalanceAfter, Guid? Reference, string? GameId = null);
 
 /// <summary>Una pagina de movimientos, de los mas recientes a los mas viejos. <paramref name="NextBefore"/> es el cursor de la pagina siguiente (null si no hay mas).</summary>
 public sealed record MovementsPage(IReadOnlyList<Movement> Items, long? NextBefore);
@@ -55,6 +56,7 @@ public sealed partial class WalletService
         var movements = new List<Movement>();
         Guid userId = Guid.Empty;
         long available = 0;
+        var gameByReservation = new Dictionary<Guid, string>();
         foreach (var stored in stream)
         {
             switch (stored.Data)
@@ -68,9 +70,16 @@ public sealed partial class WalletService
                         .Where(e => e.Account == LedgerAccountRef.Player(userId))
                         .Sum(e => e.Amount);
                     available += delta;
+                    if (ledger is BetReserved { GameId: { } game } reserved)
+                    {
+                        gameByReservation[reserved.ReservationId] = game;
+                    }
+
                     if (delta != 0)
                     {
-                        movements.Add(new Movement(stored.Version, ledger.OccurredAt, KindOf(ledger), delta, available, ReferenceOf(ledger)));
+                        var reference = ReferenceOf(ledger);
+                        var gameId = reference is { } r && gameByReservation.TryGetValue(r, out var g) ? g : null;
+                        movements.Add(new Movement(stored.Version, ledger.OccurredAt, KindOf(ledger), delta, available, reference, gameId));
                     }
 
                     break;

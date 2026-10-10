@@ -24,11 +24,11 @@ public sealed class ReserveStakeHandler(WalletService wallet)
             var key = $"reserve:{command.BetId:N}";
             if (command.TtlSeconds is { } seconds)
             {
-                await wallet.ReserveAsync(command.AccountId, key, command.BetId, command.Stake, TimeSpan.FromSeconds(Math.Clamp(seconds, MinTtlSeconds, MaxTtlSeconds)), ct);
+                await wallet.ReserveAsync(command.AccountId, key, command.BetId, command.Stake, TimeSpan.FromSeconds(Math.Clamp(seconds, MinTtlSeconds, MaxTtlSeconds)), command.GameId, ct);
             }
             else
             {
-                await wallet.ReserveAsync(command.AccountId, key, command.BetId, command.Stake, ct);
+                await wallet.ReserveAsync(command.AccountId, key, command.BetId, command.Stake, command.GameId, ct);
             }
 
             return null;

@@ -129,7 +129,7 @@ public sealed class WalletAccount
         return new OperationOutcome(transactionId, false);
     }
 
-    public OperationOutcome Reserve(string idempotencyKey, Guid reservationId, long stake, DateTimeOffset now)
+    public OperationOutcome Reserve(string idempotencyKey, Guid reservationId, long stake, DateTimeOffset now, string? gameId = null)
     {
         var fingerprint = $"reserve|{reservationId:N}|{stake}";
         if (TryReplay(idempotencyKey, fingerprint, out var replay))
@@ -153,7 +153,7 @@ public sealed class WalletAccount
             new Entry(LedgerAccountRef.Player(UserId), -stake),
             new Entry(LedgerAccountRef.Reserve(UserId), stake));
 
-        Emit(new BetReserved(transactionId, idempotencyKey, fingerprint, entries, now, reservationId, stake));
+        Emit(new BetReserved(transactionId, idempotencyKey, fingerprint, entries, now, reservationId, stake, gameId));
         return new OperationOutcome(transactionId, false);
     }
 

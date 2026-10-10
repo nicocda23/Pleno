@@ -31,7 +31,8 @@ public sealed record BetReserved(
     IReadOnlyList<Entry> Entries,
     DateTimeOffset OccurredAt,
     Guid ReservationId,
-    long Stake) : LedgerEvent(TransactionId, IdempotencyKey, Fingerprint, Entries, OccurredAt);
+    long Stake,
+    string? GameId = null) : LedgerEvent(TransactionId, IdempotencyKey, Fingerprint, Entries, OccurredAt);
 
 public sealed record BetSettled(
     Guid TransactionId,
