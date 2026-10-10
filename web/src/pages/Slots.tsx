@@ -7,10 +7,10 @@ import { useToasts } from "../components/Toasts";
 import { formatChips } from "../lib/format";
 import { errorMessage, failureMessage } from "../lib/messages";
 import { ReelsModel } from "../lib/reels";
-import { WIN_TITLES, labelOf, winTier, winningReels, type WinTier } from "../lib/slots";
+import { WIN_TITLES, cascadeFrames, labelOf, winTier, winningReels, type CascadeView, type WinTier } from "../lib/slots";
 import { SLOT_THEMES, themedLabel, useSlotTheme, type SlotThemeId } from "../lib/slotThemes";
 import { useWheelClock } from "../lib/useWheelClock";
-import { playWinSound } from "../lib/winSound";
+import { playCascadeSound, playWinSound } from "../lib/winSound";
 import { useRealtime } from "../realtime/RealtimeProvider";
 
 const CHIPS = [10, 50, 100, 500];
@@ -48,6 +48,9 @@ function Machine({ paytable }: { paytable: Paytable }) {
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<Spin | null>(null);
   const [winPopup, setWinPopup] = useState<Spin | null>(null);
+  // Cascada en curso (o la ultima, que se queda a la vista hasta el proximo giro): lo que muestran los rodillos en vez del modelo.
+  const [cascade, setCascade] = useState<CascadeView | null>(null);
+  const cascadeTimers = useRef<number[]>([]);
   const [error, setError] = useState<string | null>(null);
   // Giros automaticos que faltan (0 = apagado). El ref lo lee reveal(), que puede correr desde un callback viejo.
   const [auto, setAutoState] = useState(0);
@@ -70,6 +73,11 @@ function Machine({ paytable }: { paytable: Paytable }) {
     releaseRef.current = null;
   };
   useEffect(() => release, []);
+  const clearCascadeTimers = () => {
+    cascadeTimers.current.forEach((t) => window.clearTimeout(t));
+    cascadeTimers.current = [];
+  };
+  useEffect(() => clearCascadeTimers, []);
 
   const stakeValid = Number.isInteger(stake) && stake >= paytable.minStake && stake <= paytable.maxStake;
   const canSpin = stakeValid && stake <= balance.available && !spinning && !placeSpin.isPending;
@@ -103,12 +111,41 @@ function Machine({ paytable }: { paytable: Paytable }) {
     }
   };
 
+  /**
+   * Si el giro encadeno cascadas, las reproduce paso a paso (explotan los rodillos del premio y caen simbolos nuevos con el
+   * multiplicador mas alto) y recien al terminar muestra el resultado. Con "reducir movimiento" salta directo al final.
+   */
+  const playCascades = (closed: Spin, done: () => void) => {
+    const steps = closed.status === "Settled" ? (closed.steps ?? []) : [];
+    if (steps.length < 2) {
+      done();
+      return;
+    }
+    const last = steps[steps.length - 1]!;
+    const none = last.reels.map(() => false);
+    if (prefersReducedMotion()) {
+      setCascade({ reels: last.reels, bursting: none, dropping: none, multiplier: last.multiplier, step: steps.length - 1 });
+      done();
+      return;
+    }
+    const { frames, totalMs } = cascadeFrames(steps, paytable.cascadeMinPay);
+    clearCascadeTimers();
+    frames.forEach((frame) => {
+      cascadeTimers.current.push(window.setTimeout(() => {
+        setCascade(frame.view);
+        if (frame.view.dropping.some(Boolean)) playCascadeSound(frame.view.step);
+      }, frame.at));
+    });
+    // Un respiro despues de la ultima caida, para ver como quedo la combinacion final.
+    cascadeTimers.current.push(window.setTimeout(done, totalMs + 600));
+  };
+
   /** El resultado se muestra cuando los rodillos ya frenaron Y el giro ya esta cobrado (lo que llegue ultimo). */
   const tryReveal = () => {
     const closed = closedRef.current;
     if (!closed || !reelsDoneRef.current) return;
     closedRef.current = null;
-    reveal(closed);
+    playCascades(closed, () => reveal(closed));
   };
 
   const phase = useWheelClock(model, () => {
@@ -166,6 +203,8 @@ function Machine({ paytable }: { paytable: Paytable }) {
     // Los rodillos empiezan a girar ya, sin conocer el resultado, y el saldo se congela hasta que frenen.
     setResult(null);
     setSpinning(true);
+    clearCascadeTimers();
+    setCascade(null);
     closedRef.current = null;
     landedRef.current = false;
     reelsDoneRef.current = false;
@@ -207,7 +246,10 @@ function Machine({ paytable }: { paytable: Paytable }) {
     return () => clearTimeout(timer);
   }, [auto, spinning, placeSpin.isPending, canSpin, result, stakeValid, stake, balance.available, toasts]);
 
-  const label = phase === "settled" && result ? `Salió ${result.reels.map(nameOf).join(", ")}` : phase === "idle" ? "Rodillos quietos" : "Los rodillos están girando";
+  const finalReels = result?.steps?.length ? result.steps[result.steps.length - 1]!.reels : result?.reels;
+  const label = cascade && cascade.multiplier > 1 && spinning
+    ? `Cascada: multiplicador x${cascade.multiplier}`
+    : phase === "settled" && result && finalReels ? `Salió ${finalReels.map(nameOf).join(", ")}` : phase === "idle" ? "Rodillos quietos" : "Los rodillos están girando";
 
   return (
     <div className="stack">
@@ -227,7 +269,7 @@ function Machine({ paytable }: { paytable: Paytable }) {
               </button>
             ))}
           </div>
-          <ReelsView model={model} names={names} phase={phase} label={label} theme={theme} win={!spinning && result?.status === "Settled" && (result.payout ?? 0) > result.stake ? result : null} />
+          <ReelsView model={model} names={names} phase={phase} label={label} theme={theme} cascade={cascade} win={!spinning && result?.status === "Settled" && (result.payout ?? 0) > result.stake ? result : null} />
 
           <h3 className="section-subtitle">Cuántas fichas</h3>
           <div className="chips chips--stake" role="radiogroup" aria-label="Fichas a apostar">
@@ -304,6 +346,9 @@ function Machine({ paytable }: { paytable: Paytable }) {
               </li>
             ))}
           </ul>
+          <p className="muted" data-testid="cascade-help">
+            Cascadas: un premio que supera tu apuesta hace explotar los rodillos que lo forman; se sortean de nuevo y el próximo premio vale {paytable.cascadeMultipliers.slice(1).map((m) => `x${m}`).join(", ")} (una cadena como máximo de {paytable.cascadeMultipliers.length} pasos).
+          </p>
           <p className="muted">
             Retorno teórico {paytable.returnToPlayerPercent.toLocaleString("es-AR")} %. Algún premio en {paytable.hitRatePercent.toLocaleString("es-AR")} de cada 100 giros, casi siempre chico: los grandes son raros.
           </p>
@@ -313,7 +358,8 @@ function Machine({ paytable }: { paytable: Paytable }) {
             {recent.data?.filter((s) => s.status === "Settled").slice(0, 30).map((s) => (
               <li key={s.betId}>
                 <span className="spin-list__reels" aria-hidden="true">{s.reels.map((name, i) => <SlotSymbol key={i} theme={theme} name={name} />)}</span>
-                <span className="sr-only">{s.reels.map(nameOf).join(", ")}</span>
+                <span className="sr-only">{s.reels.map(nameOf).join(", ")}{(s.steps?.length ?? 0) > 1 ? `, con ${s.steps!.length - 1} cascadas` : ""}</span>
+                {(s.steps?.length ?? 0) > 1 && <span className="spin-list__chain" aria-hidden="true">⚡{s.steps!.length - 1}</span>}
                 <span className={(s.payout ?? 0) > s.stake ? "win" : "muted"}>{(s.payout ?? 0) > 0 ? `+${formatChips(s.payout ?? 0)}` : "—"}</span>
               </li>
             ))}
@@ -327,11 +373,12 @@ function Machine({ paytable }: { paytable: Paytable }) {
           <Confetti pieces={CONFETTI[winTier(winPopup.multiplier)]} />
           <div className="win-modal__box" onClick={(e) => e.stopPropagation()}>
             <div className={`reels reels--static reels--${theme}`} aria-hidden="true">
-              {winPopup.reels.map((name, i) => (
+              {(winPopup.steps?.length ? winPopup.steps[winPopup.steps.length - 1]!.reels : winPopup.reels).map((name, i) => (
                 <span key={i} className="reel reel--win"><span className="reel__cell"><SlotSymbol theme={theme} name={name} /></span></span>
               ))}
             </div>
             <h2 id="win-title" className="win-modal__title">{WIN_TITLES[winTier(winPopup.multiplier)]}</h2>
+            {(winPopup.steps?.length ?? 0) > 1 && <p className="win-modal__chain">⚡ {winPopup.steps!.length - 1} {winPopup.steps!.length === 2 ? "cascada" : "cascadas"} encadenadas</p>}
             <p className="sr-only">{formatChips((winPopup.payout ?? 0) - winPopup.stake)} fichas</p>
             <p className="win-modal__amount" aria-hidden="true"><CountUp to={(winPopup.payout ?? 0) - winPopup.stake} /> <span>fichas</span></p>
             <p className="muted">Apostaste {formatChips(winPopup.stake)} y cobraste {formatChips(winPopup.payout ?? 0)} (x{winPopup.multiplier}).</p>
@@ -346,7 +393,7 @@ function Machine({ paytable }: { paytable: Paytable }) {
 }
 
 /** Dibuja lo que muestra el modelo: el modelo cambia solo, asi que se lo mira en cada cuadro y se re-renderiza solo si algo cambio. */
-function ReelsView({ model, names, phase, label, theme, win }: { model: ReelsModel; names: string[]; phase: string; label: string; theme: SlotThemeId; win: Spin | null }) {
+function ReelsView({ model, names, phase, label, theme, win, cascade }: { model: ReelsModel; names: string[]; phase: string; label: string; theme: SlotThemeId; win: Spin | null; cascade: CascadeView | null }) {
   const [shown, setShown] = useState(() => [...model.display]);
   const [stopped, setStopped] = useState(() => [...model.stopped]);
   const [tense, setTense] = useState(false);
@@ -363,15 +410,20 @@ function ReelsView({ model, names, phase, label, theme, win }: { model: ReelsMod
     return () => cancelAnimationFrame(frame);
   }, [model]);
 
-  const winning = win ? winningReels(win.reels) : null;
+  // El premio que se resalta es el de la combinacion que quedo al final de la cadena (si esa combinacion paga).
+  const finalStep = win?.steps?.length ? win.steps[win.steps.length - 1]! : null;
+  const winning = win && (finalStep ? finalStep.pay > 0 : true) ? winningReels(finalStep?.reels ?? win.reels) : null;
   const tier = win ? winTier(win.multiplier) : null;
 
   return (
     <div className={`reels reels--${theme} ${tense ? "reels--tense" : ""} ${tier ? `reels--${tier}` : ""}`} role="img" aria-label={label} data-testid="reels" data-state={phase}>
-      {shown.map((symbol, i) => (
-        <span key={i} className={`reel ${stopped[i] ? "" : "reel--spinning"} ${!stopped[i] && tense && i === shown.length - 1 ? "reel--tense" : ""} ${winning?.[i] ? "reel--win" : ""}`} data-testid={`reel-${i}`} data-symbol={names[symbol]}>
+      {cascade && cascade.multiplier > 1 && <span key={cascade.step} className="cascade-badge" aria-hidden="true" data-testid="cascade-badge">x{cascade.multiplier}</span>}
+      {shown.map((symbol, i) => {
+        const shownName = cascade?.reels[i] ?? names[symbol] ?? "";
+        return (
+        <span key={i} className={`reel ${stopped[i] ? "" : "reel--spinning"} ${!stopped[i] && tense && i === shown.length - 1 ? "reel--tense" : ""} ${winning?.[i] ? "reel--win" : ""} ${cascade?.bursting[i] ? "reel--burst" : ""} ${cascade?.dropping[i] ? "reel--drop" : ""}`} data-testid={`reel-${i}`} data-symbol={shownName}>
           {stopped[i] ? (
-            <span className="reel__cell reel__cell--landed"><SlotSymbol theme={theme} name={names[symbol] ?? ""} /></span>
+            <span className="reel__cell reel__cell--landed"><SlotSymbol theme={theme} name={shownName} /></span>
           ) : (
             // Cinta vertical con los simbolos repetidos: al desplazarla la mitad se ve continua. Cada rodillo, a su velocidad.
             <span className="reel__strip" aria-hidden="true" style={{ animationDuration: `${(names.length * (0.07 + (i % 2) * 0.035)).toFixed(3)}s`, animationDelay: `${-i * 0.11}s` }}>
@@ -381,7 +433,8 @@ function ReelsView({ model, names, phase, label, theme, win }: { model: ReelsMod
             </span>
           )}
         </span>
-      ))}
+        );
+      })}
     </div>
   );
 }
