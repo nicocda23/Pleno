@@ -212,7 +212,7 @@ function TrucoTable({ table, onLeave }: { table: LiveTable<TrucoView>; onLeave: 
             {recapText && <p className="tru-recap" role="status" data-testid="tru-recap">{recapText}</p>}
             <div className="tru-pile" data-testid="tru-pile">
               {pile.map((play, i) => {
-                const spot = pileSpot(i, play.seat === me);
+                const spot = pileSpot(i);
                 const style = { "--dx": `${spot.dx}px`, "--dy": `${spot.dy}px`, "--rot": `${spot.rot}deg`, zIndex: i + 1 } as CSSProperties;
                 return (
                   <div key={`${showingRecap ? "r" : "p"}${i}`} className="tru-pile__card" data-mano={Math.floor(i / 2) + 1} style={style}>
