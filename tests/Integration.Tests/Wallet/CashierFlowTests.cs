@@ -169,7 +169,7 @@ public sealed class CashierFlowTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, (await LoadAsync(cashierClient, player, 150, "c-1")).StatusCode);
 
         Assert.Equal((600L, 0L), await BalanceAsync(head));
-        Assert.Equal((250L, 0L), await BalanceAsync(cashier));
+        Assert.Equal((253L, 0L), await BalanceAsync(cashier)); // 400 - 150 + 3 de comision (2 % de 150)
         Assert.Equal((150L, 0L), await BalanceAsync(player));
     }
 
@@ -245,7 +245,7 @@ public sealed class CashierFlowTests : IDisposable
 
         Assert.False(first.GetProperty("isDuplicate").GetBoolean());
         Assert.True(again.GetProperty("isDuplicate").GetBoolean());
-        Assert.Equal((900L, 0L), await BalanceAsync(cashier));
+        Assert.Equal((902L, 0L), await BalanceAsync(cashier)); // 1.000 - 100 + 2 de comision, una sola vez
         Assert.Equal((100L, 0L), await BalanceAsync(player));
         Assert.Equal(HttpStatusCode.Conflict, (await LoadAsync(cashierClient, player, 200, "same")).StatusCode); // otra cantidad con la misma clave
     }
