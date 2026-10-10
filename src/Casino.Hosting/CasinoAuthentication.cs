@@ -37,6 +37,13 @@ public static class CasinoAuthentication
             .AddJwtBearer(options =>
             {
                 options.Authority = authority;
+                // En modo red local el emisor es la URL publica (https://<ip>:5173/realms/casino), que el servicio no alcanza (certificado
+                // autofirmado): los metadatos se leen de Keycloak directo y el emisor del token se sigue validando contra Authority.
+                if (builder.Configuration["Authentication:MetadataAddress"] is { Length: > 0 } metadataAddress)
+                {
+                    options.MetadataAddress = metadataAddress;
+                }
+
                 options.Audience = Audience;
                 options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
                 options.MapInboundClaims = false; // conserva "sub" y "preferred_username" tal cual vienen en el token
