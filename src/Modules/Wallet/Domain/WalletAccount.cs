@@ -129,6 +129,41 @@ public sealed class WalletAccount
         return new OperationOutcome(transactionId, false);
     }
 
+    /// <summary>Mitad de salida de una transferencia: descuenta las fichas de esta cuenta (si alcanzan) a favor de <paramref name="toUserId"/>.</summary>
+    public OperationOutcome TransferOut(string idempotencyKey, Guid transferId, Guid toUserId, long amount, DateTimeOffset now) =>
+        Transfer(idempotencyKey, transferId, UserId, toUserId, amount, now);
+
+    /// <summary>Mitad de entrada de una transferencia: suma las fichas a esta cuenta, que viajan desde <paramref name="fromUserId"/>.</summary>
+    public OperationOutcome TransferIn(string idempotencyKey, Guid transferId, Guid fromUserId, long amount, DateTimeOffset now) =>
+        Transfer(idempotencyKey, transferId, fromUserId, UserId, amount, now);
+
+    private OperationOutcome Transfer(string idempotencyKey, Guid transferId, Guid fromUserId, Guid toUserId, long amount, DateTimeOffset now)
+    {
+        var fingerprint = $"transfer|{fromUserId:N}|{toUserId:N}|{amount}";
+        if (TryReplay(idempotencyKey, fingerprint, out var replay))
+        {
+            return replay;
+        }
+
+        RequirePositive(amount);
+        if (fromUserId == toUserId)
+        {
+            throw new WalletDomainException(WalletError.InvalidTransfer, "No se pueden transferir fichas a la misma cuenta.");
+        }
+
+        if (fromUserId == UserId && Available < amount)
+        {
+            throw new WalletDomainException(WalletError.InsufficientFunds, $"Saldo insuficiente: {Available} < {amount}.");
+        }
+
+        var entries = LedgerEntries.Balanced(
+            new Entry(LedgerAccountRef.Player(fromUserId), -amount),
+            new Entry(LedgerAccountRef.Player(toUserId), amount));
+
+        Emit(new ChipsTransferred(transferId, idempotencyKey, fingerprint, entries, now, fromUserId, toUserId, amount));
+        return new OperationOutcome(transferId, false);
+    }
+
     public OperationOutcome Reserve(string idempotencyKey, Guid reservationId, long stake, DateTimeOffset now, string? gameId = null)
     {
         var fingerprint = $"reserve|{reservationId:N}|{stake}";
@@ -229,6 +264,12 @@ public sealed class WalletAccount
         if (_reversed.Contains(transactionIdToReverse))
         {
             throw new WalletDomainException(WalletError.AlreadyReversed, "La transaccion ya fue revertida.");
+        }
+
+        if (original.Kind == LedgerKind.Transfer)
+        {
+            // La otra mitad vive en otra cuenta: revertir una sola dejaria las fichas desparejas. Se corrige con una transferencia en sentido contrario.
+            throw new WalletDomainException(WalletError.ReversalNotAllowed, "Una transferencia no se revierte: se compensa con otra en sentido contrario.");
         }
 
         if (original.Kind == LedgerKind.Reserve && !_openReservations.ContainsKey(original.ReservationId!.Value))
@@ -387,6 +428,7 @@ public sealed class WalletAccount
     private static LedgerRecord ToRecord(LedgerEvent ledger) => ledger switch
     {
         ChipsCredited => new LedgerRecord(ledger.TransactionId, LedgerKind.Credit, ledger.Entries, null, 0),
+        ChipsTransferred => new LedgerRecord(ledger.TransactionId, LedgerKind.Transfer, ledger.Entries, null, 0),
         BetReserved r => new LedgerRecord(ledger.TransactionId, LedgerKind.Reserve, ledger.Entries, r.ReservationId, r.Stake),
         BetSettled s => new LedgerRecord(ledger.TransactionId, LedgerKind.Settle, ledger.Entries, s.ReservationId, s.Stake),
         ReservationReleased r => new LedgerRecord(ledger.TransactionId, LedgerKind.Release, ledger.Entries, r.ReservationId, r.Stake),

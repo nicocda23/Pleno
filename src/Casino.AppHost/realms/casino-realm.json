@@ -40,6 +40,14 @@
       {
         "name": "backoffice",
         "description": "Personal de backoffice: ajustes y auditoria"
+      },
+      {
+        "name": "cashier",
+        "description": "Cajero: carga fichas (de su saldo) a los jugadores de su jurisdiccion. Tambien es jugador"
+      },
+      {
+        "name": "head_cashier",
+        "description": "Jefe de cajeros: carga fichas (de su saldo) a los cajeros de su jurisdiccion. Tambien es jugador"
       }
     ]
   },
@@ -157,6 +165,28 @@
       "lastName": "Uno",
       "credentials": [{ "type": "password", "value": "backoffice1-dev", "temporary": false }],
       "realmRoles": ["backoffice"]
+    },
+    {
+      "id": "0a1b2c3d-0004-4000-8000-000000000004",
+      "username": "jefe1",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "jefe1@casino.test",
+      "firstName": "Jefe",
+      "lastName": "Uno",
+      "credentials": [{ "type": "password", "value": "jefe1-dev", "temporary": false }],
+      "realmRoles": ["default-roles-casino", "head_cashier"]
+    },
+    {
+      "id": "0a1b2c3d-0005-4000-8000-000000000005",
+      "username": "cajero1",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "cajero1@casino.test",
+      "firstName": "Cajero",
+      "lastName": "Uno",
+      "credentials": [{ "type": "password", "value": "cajero1-dev", "temporary": false }],
+      "realmRoles": ["default-roles-casino", "cashier"]
     }
   ]
 }

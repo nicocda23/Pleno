@@ -17,7 +17,47 @@ export interface AuditEntry {
 }
 
 /** Que paso con las fichas disponibles. */
-export type MovementKind = "WelcomeBonus" | "Credit" | "Stake" | "Prize" | "Refund" | "Reversal";
+export type MovementKind = "WelcomeBonus" | "Credit" | "Stake" | "Prize" | "Refund" | "Reversal" | "TransferIn" | "TransferOut";
+
+/** Nivel en la jerarquia de cargas (los mismos nombres que los roles). */
+export type HierarchyLevel = "player" | "cashier" | "head_cashier";
+
+/** Un nodo del arbol de cargas: de quien depende cada usuario (lo arma el backoffice). */
+export interface HierarchyNode {
+  userId: string;
+  level: HierarchyLevel;
+  /** Nombre de usuario (si ya lo usó la API estando en el árbol). */
+  displayName?: string | null;
+  parentUserId: string | null;
+  updatedAt: string;
+}
+
+/** Mi lugar en la jerarquia (cajero o jefe). */
+export interface CashierMe {
+  userId: string;
+  level: HierarchyLevel;
+  parentUserId: string | null;
+}
+
+/** Alguien de mi jurisdiccion directa; el saldo es null si todavia no abrio su cuenta. */
+export interface JurisdictionMember {
+  userId: string;
+  level: HierarchyLevel;
+  /** Nombre de usuario para distinguirlo; null hasta que use la app. Solo lo ve quien lo tiene a cargo. */
+  displayName?: string | null;
+  available: number | null;
+  reserved: number | null;
+}
+
+/** Una carga que hice. */
+export interface CashierTransfer {
+  targetUserId: string;
+  /** Solo viene si el destinatario sigue a mi cargo. */
+  targetName?: string | null;
+  amount: number;
+  transactionId: string;
+  occurredAt: string;
+}
 
 /** Un movimiento del saldo: `delta` con signo y el saldo disponible justo despues. */
 export interface Movement {

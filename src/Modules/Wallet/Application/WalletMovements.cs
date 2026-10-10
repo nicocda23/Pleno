@@ -23,6 +23,12 @@ public enum MovementKind
 
     /// <summary>Una operacion anterior se revirtio.</summary>
     Reversal = 6,
+
+    /// <summary>Fichas recibidas de otro jugador (la carga de un cajero, por ejemplo).</summary>
+    TransferIn = 7,
+
+    /// <summary>Fichas enviadas a otro jugador.</summary>
+    TransferOut = 8,
 }
 
 /// <summary>
@@ -79,7 +85,7 @@ public sealed partial class WalletService
                     {
                         var reference = ReferenceOf(ledger);
                         var gameId = reference is { } r && gameByReservation.TryGetValue(r, out var g) ? g : null;
-                        movements.Add(new Movement(stored.Version, ledger.OccurredAt, KindOf(ledger), delta, available, reference, gameId));
+                        movements.Add(new Movement(stored.Version, ledger.OccurredAt, KindOf(ledger, delta), delta, available, reference, gameId));
                     }
 
                     break;
@@ -91,8 +97,9 @@ public sealed partial class WalletService
         return new MovementsPage(items, older.Count > limit ? items[^1].Version : null);
     }
 
-    private static MovementKind KindOf(LedgerEvent ledger) => ledger switch
+    private static MovementKind KindOf(LedgerEvent ledger, long delta) => ledger switch
     {
+        ChipsTransferred => delta > 0 ? MovementKind.TransferIn : MovementKind.TransferOut,
         ChipsCredited c when c.IdempotencyKey == "welcome-bonus" => MovementKind.WelcomeBonus,
         ChipsCredited => MovementKind.Credit,
         BetReserved => MovementKind.Stake,

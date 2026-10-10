@@ -24,6 +24,20 @@ public sealed record ChipsCredited(
     DateTimeOffset OccurredAt,
     long Amount) : LedgerEvent(TransactionId, IdempotencyKey, Fingerprint, Entries, OccurredAt);
 
+/// <summary>
+/// Transferencia de fichas entre dos jugadores (cargas de cajeros, cobros). Se guarda UNA vez en cada cuenta (la que sale y la que recibe) con los MISMOS
+/// asientos y el MISMO <c>TransactionId</c>; cada cuenta solo proyecta su parte. Las dos mitades se escriben en una sola transaccion.
+/// </summary>
+public sealed record ChipsTransferred(
+    Guid TransactionId,
+    string IdempotencyKey,
+    string Fingerprint,
+    IReadOnlyList<Entry> Entries,
+    DateTimeOffset OccurredAt,
+    Guid FromUserId,
+    Guid ToUserId,
+    long Amount) : LedgerEvent(TransactionId, IdempotencyKey, Fingerprint, Entries, OccurredAt);
+
 public sealed record BetReserved(
     Guid TransactionId,
     string IdempotencyKey,

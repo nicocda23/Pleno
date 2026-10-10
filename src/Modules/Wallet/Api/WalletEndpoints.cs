@@ -9,6 +9,10 @@ namespace Casino.Modules.Wallet.Api;
 
 public sealed record CreditRequest(long Amount);
 
+public sealed record HierarchyAssignRequest(string? Level, Guid? ParentUserId);
+
+public sealed record HierarchyNodeResponse(Guid UserId, string Level, string? DisplayName, Guid? ParentUserId, DateTimeOffset UpdatedAt);
+
 public sealed record AuditEntryResponse(
     string Action, Guid ActorUserId, Guid TargetUserId, long Amount, Guid TransactionId, DateTimeOffset OccurredAt);
 
@@ -32,9 +36,13 @@ internal static class WalletEndpoints
 
     public static void Map(IEndpointRouteBuilder app)
     {
+        CashierEndpoints.Map(app);
+
         var player = app.MapGroup("/wallet").WithTags("Wallet");
         player.RequireAuthorization(policy => policy.RequireRole(Roles.Player));
         player.AddEndpointFilter(MapDomainErrors);
+        // El front consulta /wallet/me todo el tiempo: asi el nombre de quien esta en el arbol se mantiene al dia sin pedidos extra.
+        player.AddEndpointFilter(CashierEndpoints.CaptureDisplayName);
 
         // La cuenta se deriva del usuario autenticado: no hay forma de pedir la de otro.
         player.MapGet("/me", (HttpContext http, WalletService wallet, CancellationToken ct) =>
@@ -91,6 +99,24 @@ internal static class WalletEndpoints
                 history.NextBefore, history.TotalAmount, history.Count));
         });
 
+        // Jerarquia de cargas: quien es jefe de cajeros, cajero o jugador y de quien depende. Los roles de Keycloak dan acceso; el arbol dice a quien se le puede cargar.
+        backoffice.MapGet("/hierarchy", async (CashierService cashiers, CancellationToken ct) =>
+            Results.Ok((await cashiers.ListAllAsync(ct)).Select(n => new HierarchyNodeResponse(n.Id, CashierService.NameOf(n.Level), n.DisplayName, n.ParentUserId, n.UpdatedAt))));
+
+        backoffice.MapPut("/hierarchy/{userId:guid}", async (Guid userId, HierarchyAssignRequest body, HttpContext context, CashierService cashiers, CancellationToken ct) =>
+        {
+            if (!CashierService.TryParseLevel(body.Level, out var level))
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: nameof(WalletError.InvalidHierarchy),
+                    detail: $"El nivel tiene que ser '{Roles.Player}', '{Roles.Cashier}' o '{Roles.HeadCashier}'.");
+            }
+
+            var node = await cashiers.AssignAsync(context.User.GetUserId(), userId, level, body.ParentUserId, ct);
+            return Results.Ok(new HierarchyNodeResponse(node.Id, CashierService.NameOf(node.Level), node.DisplayName, node.ParentUserId, node.UpdatedAt));
+        });
+
         // Registro de auditoria: quien cargo fichas, a quien y cuando.
         backoffice.MapGet("/audit", async (int? limit, BackofficeAudit audit, CancellationToken ct) =>
         {
@@ -114,7 +140,7 @@ internal static class WalletEndpoints
             : Results.Ok(balance);
     }
 
-    private static async ValueTask<object?> MapDomainErrors(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
+    internal static async ValueTask<object?> MapDomainErrors(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         try
         {
@@ -126,12 +152,14 @@ internal static class WalletEndpoints
         }
     }
 
-    private static int StatusFor(WalletError error) => error switch
+    internal static int StatusFor(WalletError error) => error switch
     {
         WalletError.AccountNotFound or WalletError.ReservationNotFound or WalletError.TransactionNotFound
             => StatusCodes.Status404NotFound,
-        WalletError.InvalidAmount or WalletError.InvalidIdempotencyKey
+        WalletError.InvalidAmount or WalletError.InvalidIdempotencyKey or WalletError.InvalidTransfer
             => StatusCodes.Status400BadRequest,
+        WalletError.NotInJurisdiction
+            => StatusCodes.Status403Forbidden,
         WalletError.InsufficientFunds
             => StatusCodes.Status422UnprocessableEntity,
         _ => StatusCodes.Status409Conflict,

@@ -5,7 +5,9 @@ import { RequireAuth } from "./auth/RequireAuth";
 import { GAME_PAGES } from "./games/registry";
 import { Admin } from "./pages/Admin";
 import { AdminCredits } from "./pages/AdminCredits";
+import { AdminHierarchy } from "./pages/AdminHierarchy";
 import { AdminSlots } from "./pages/AdminSlots";
+import { Cashier } from "./pages/Cashier";
 import { Movements } from "./pages/Movements";
 import { AuthCallback } from "./pages/AuthCallback";
 import { History } from "./pages/History";
@@ -28,6 +30,8 @@ export function App() {
           <Route path="admin" element={<Admin />} />
           <Route path="admin/cargas" element={<AdminCredits />} />
           <Route path="admin/tragamonedas" element={<AdminSlots />} />
+          <Route path="admin/jerarquia" element={<AdminHierarchy />} />
+          <Route path="cajero" element={<Cashier />} />
           <Route path="movimientos" element={<Movements />} />
         </Route>
         <Route path="*" element={<NotFound />} />

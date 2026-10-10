@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { renderApp } from "../test/harness";
+import { fakeApi, renderApp } from "../test/harness";
 import { Layout } from "./Layout";
 
 const menu = () => document.getElementById("menu-principal")!;
@@ -46,5 +46,15 @@ describe("Layout (barra superior)", () => {
 
     expect(menu()).not.toContainElement(balance);
     expect(document.querySelector("header")).toContainElement(balance);
+  });
+  it("shows the Cajero link only to cashiers and heads of cashiers", async () => {
+    const meOf = (roles: string[]) => ({ userId: "u1", displayName: "x", roles, accountId: "a", registeredAt: "2026-10-01T10:00:00Z" });
+    const { unmount } = renderApp(<Layout />, { api: fakeApi({ "GET /me": () => meOf(["player", "cashier"]) }) });
+    expect(await screen.findByRole("link", { name: "Cajero" })).toBeInTheDocument();
+    unmount();
+
+    renderApp(<Layout />, { api: fakeApi({ "GET /me": () => meOf(["player"]) }) });
+    await screen.findByRole("link", { name: "Lobby" });
+    expect(screen.queryByRole("link", { name: "Cajero" })).not.toBeInTheDocument();
   });
 });

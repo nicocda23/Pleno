@@ -14,6 +14,9 @@ public enum WalletError
     AlreadyReversed,
     ReversalNotAllowed,
     ReversalWouldOverdraw,
+    InvalidTransfer,
+    NotInJurisdiction,
+    InvalidHierarchy,
 }
 
 public sealed class WalletDomainException(WalletError error, string message) : Exception(message)
