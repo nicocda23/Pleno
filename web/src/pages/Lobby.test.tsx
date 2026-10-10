@@ -76,6 +76,15 @@ describe("Lobby catalog", () => {
     expect(section().getAllByText("Poker")).toHaveLength(1);
   });
 
+  it("lists Truco with a link now that the front has its page", async () => {
+    const truco: GameInfo = { id: "truco", name: "Truco", tagline: "Mesas entre jugadores.", route: "/truco", glyph: "T", resolution: "Server" };
+    renderApp(<Lobby />, { api: apiWith(() => [roulette, slots, truco]) });
+
+    expect(await section().findByRole("link", { name: /Truco/ })).toHaveAttribute("href", "/truco");
+    expect(section().getAllByText("Truco")).toHaveLength(1);
+  });
+
+
   it("does not show as coming soon a game the server does not have and the front already has a page for", async () => {
     renderApp(<Lobby />, { api: apiWith(() => [roulette, slots]) });
 

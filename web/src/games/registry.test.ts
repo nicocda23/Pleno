@@ -11,6 +11,7 @@ describe("game registry", () => {
     expect(pageFor("blackjack")?.route).toBe("blackjack");
     expect(pageFor("uno")?.route).toBe("uno");
     expect(pageFor("poker")?.route).toBe("poker");
+    expect(pageFor("truco")?.route).toBe("truco");
     expect(pageFor("no-existe")).toBeUndefined();
     expect(new Set(GAME_PAGES.map((p) => p.id)).size).toBe(GAME_PAGES.length);
     expect(new Set(GAME_PAGES.map((p) => p.route)).size).toBe(GAME_PAGES.length);

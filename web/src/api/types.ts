@@ -543,3 +543,48 @@ export interface PokerView {
 
 /** La jugada propia de Poker. `to`: monto TOTAL al que se sube en esta ronda. */
 export type PokerAction = { type: "fold" } | { type: "check" } | { type: "call" } | { type: "raise"; to: number };
+
+// Truco
+export type TrucoEventKind = "start" | "play" | "truco" | "retruco" | "vale4" | "envido" | "real_envido" | "falta_envido" | "quiero" | "no_quiero" | "mazo" | "baza" | "parda" | "envido_result" | "hand_end";
+
+export interface TrucoEvent {
+  seat: number;
+  kind: TrucoEventKind;
+  card: number | null;
+  value: number | null;
+  a: number | null;
+  b: number | null;
+}
+
+/** Un canto que espera respuesta: un truco (`level` 1 a 3) o un envido (con la cadena de cantos). */
+export interface TrucoPending {
+  kind: "truco" | "envido";
+  caller: number;
+  level: number;
+  calls: string[];
+}
+
+/** Lo que ve mi asiento: mis cartas y mi envido, la mesa de esta ronda, el marcador, el canto pendiente y las jugadas legales ahora. */
+export interface TrucoView {
+  you: number | null;
+  hand: number[];
+  envidoPoints: number | null;
+  opponentCards: number;
+  table: { seat: number; card: number }[];
+  bazas: number[];
+  scores: number[];
+  target: number;
+  mano: number;
+  handNo: number;
+  current: number;
+  trucoLevel: number;
+  pending: TrucoPending | null;
+  actions: TrucoActionType[];
+  winner: number;
+  events: TrucoEvent[];
+}
+
+export type TrucoActionType = "play" | "truco" | "retruco" | "vale4" | "envido" | "real_envido" | "falta_envido" | "quiero" | "no_quiero" | "mazo";
+
+/** La jugada propia de Truco: las cartas se juegan con `play`. */
+export type TrucoAction = { type: "play"; card: number } | { type: Exclude<TrucoActionType, "play"> };
