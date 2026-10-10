@@ -184,7 +184,7 @@ function CreateTable({ gameId, gameName, rules, rulesFailed, onCreated }: { game
     <section className="card" aria-labelledby="tl-crear">
       <h2 id="tl-crear" className="section-title">Crear mesa</h2>
       <p className="muted tl-intro">¿No hay una mesa para vos? Armá la tuya: elegí cuántas fichas pone cada uno y cuántos juegan. Después la abrís a otros jugadores o sumás bots.</p>
-      <form className="tl-form" onSubmit={(e) => void submit(e)}>
+      <form id="tl-create-form" className="tl-form" onSubmit={(e) => void submit(e)}>
         <label className="field">
           <span>Nombre (opcional)</span>
           <input type="text" value={name} maxLength={40} placeholder={`Mesa de ${gameName}`} onChange={(e) => setName(e.target.value)} />
@@ -212,11 +212,14 @@ function CreateTable({ gameId, gameName, rules, rulesFailed, onCreated }: { game
         <p id="tl-private-hint" className="tl-hint">{isPrivate ? "No aparece en la lista: te damos un código de 6 caracteres para pasarle a quien quieras que juegue." : "Aparece en la lista de mesas abiertas y cualquiera puede unirse."}</p>
         {!entryValid && <p className="notice notice--error" role="alert">La entrada va de {formatChips(rules.minBuyIn)} a {formatChips(rules.maxBuyIn)} fichas.</p>}
         {entryValid && !affordable && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa entrada.</p>}
-        <button type="submit" className="btn btn--gold btn--lg" disabled={!entryValid || !affordable || create.isPending}>
-          {create.isPending ? "Creando…" : "Crear mesa"}
-        </button>
         {error && <p className="notice notice--error" role="alert">{error}</p>}
       </form>
+      {/* Pegado abajo (como en los juegos): el boton va fuera del formulario pero lo envia con `form`. */}
+      <div className="dock">
+        <button type="submit" form="tl-create-form" className="btn btn--gold btn--lg btn--block" disabled={!entryValid || !affordable || create.isPending}>
+          {create.isPending ? "Creando…" : "Crear mesa"}
+        </button>
+      </div>
     </section>
   );
 }
@@ -335,8 +338,15 @@ function WaitingRoom({ gameId, gameName, table, onExit }: { gameId: string; game
         ))}
       </ul>
 
+      {table.isOwner && blocker && <p id="tl-blocker" className="muted" role="status">{blocker}</p>}
+      {error && <p className="notice notice--error" role="alert">{error}</p>}
+
+      <button type="button" className="link-btn" disabled={leave.isPending} onClick={() => { setError(null); leave.mutate(table.id, { onSuccess: onExit, onError: fail }); }}>
+        Salir de la mesa
+      </button>
+
       {table.isOwner ? (
-        <div className="tl-actions">
+        <div className="tl-actions dock">
           <button type="button" className="btn btn--ghost" disabled={busy || table.seats.length >= table.maxPlayers} onClick={() => { setError(null); bots.add.mutate(undefined, { onError: fail }); }}>
             Agregar bot
           </button>
@@ -350,12 +360,6 @@ function WaitingRoom({ gameId, gameName, table, onExit }: { gameId: string; game
       ) : (
         <p className="muted" role="status">Esperando que el dueño de la mesa empiece la partida.</p>
       )}
-      {table.isOwner && blocker && <p id="tl-blocker" className="muted" role="status">{blocker}</p>}
-      {error && <p className="notice notice--error" role="alert">{error}</p>}
-
-      <button type="button" className="link-btn" disabled={leave.isPending} onClick={() => { setError(null); leave.mutate(table.id, { onSuccess: onExit, onError: fail }); }}>
-        Salir de la mesa
-      </button>
     </section>
     </div>
   );

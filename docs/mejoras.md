@@ -23,11 +23,12 @@ Formato: `- [ ]` pendiente · `- [x]` hecho. Agregar la fecha o el PR al cerrar 
 - [x] **Truco: más cartelería y mejor distribución.** No se entendía qué respondía el rival ante cada canto ni si se ganaba o perdía: ahora hay carteles grandes (canto, quiero/no quiero, mano ganada/perdida, envido, ronda y partida). El marcador quedaba muy arriba y las cartas muy abajo: se redujo el espacio y las cartas del rival van a un costado, en abanico (triángulo invertido) agarradas por una mano, sin ocupar un renglón entero.
 
 ### Crash
-- [ ] **CRÍTICO: a veces no aparece la opción de retirar (detener) tras iniciar la apuesta.** El jugador pierde las fichas sin poder cobrar. Causa desconocida. Mínimo: no debe iniciarse/debitarse la apuesta si el cliente no puede retirar (por ejemplo, confirmar que el tiempo real está conectado y el botón de retiro habilitado antes de aceptar la apuesta). Investigar también por qué falta el botón (¿estado de ronda, reconexión, mensaje perdido?) y evaluar retiro automático o reembolso si la ronda arrancó sin poder retirar.
-- [ ] **Crash: límite al multiplicador / más probabilidad de explotar mientras sube.** Una ronda llegó a 486x y paga demasiado. Hoy la explosión sale de una distribución de cola larga (puede llegar hasta x1.000). Evaluar un tope más bajo (por ejemplo x100) y/o un riesgo de explosión que crezca con el multiplicador, sin romper la verificación provably fair ni el margen de la casa (ver `docs/juego-crash.md`).
+- [x] **CRÍTICO: a veces no aparece la opción de retirar (detener) tras iniciar la apuesta.** El jugador pierde las fichas sin poder cobrar. Causa desconocida. Mínimo: no debe iniciarse/debitarse la apuesta si el cliente no puede retirar (por ejemplo, confirmar que el tiempo real está conectado y el botón de retiro habilitado antes de aceptar la apuesta). Investigar también por qué falta el botón (¿estado de ronda, reconexión, mensaje perdido?) y evaluar retiro automático o reembolso si la ronda arrancó sin poder retirar. _(PR #52: botón de retiro siempre visible con apuesta en juego, consulta cada 250 ms, no se apuesta sin tiempo real. Causa raíz no confirmada: reabrir si vuelve a pasar.)_
+- [x] **Crash: límite al multiplicador / más probabilidad de explotar mientras sube.** Una ronda llegó a 486x y paga demasiado. Hoy la explosión sale de una distribución de cola larga (puede llegar hasta x1.000). Evaluar un tope más bajo (por ejemplo x100) y/o un riesgo de explosión que crezca con el multiplicador, sin romper la verificación provably fair ni el margen de la casa (ver `docs/juego-crash.md`). _(PR #56: tope en x100.)_
 
 ### Ruleta
-- [ ] _(anotar)_
+- [ ] **Ruleta: apuestas de columna dentro de cada columna.** Las apuestas de columna 1, 2 y 3 (los "2 a 1") deben estar como objetos/celdas dentro de sus respectivas columnas del tapete, no aparte.
+- [ ] **Ruleta: los botones 1-18 y 19-36 ocupan mitad y mitad.** Que ocupen cada uno la mitad del ancho de su fila.
 
 ## Entorno
 Local (Aspire, Docker, Keycloak), red local, configuración, despliegue.
@@ -46,6 +47,7 @@ Navegación, responsive, accesibilidad, mensajes, sonidos.
 - [x] **Extraer el módulo de "cuántas fichas" del tragamonedas a un componente compartido.** Separarlo de `Slots.tsx` en un componente reutilizable y usarlo en todos los juegos donde aplique (ruleta, blackjack, crash, etc.), para unificar la UX y evitar duplicación. La selección rápida de fichas (los botones de montos) no debe ocupar más de una fila (sin saltos de línea, también en móvil).
 - [x] **Login: el ícono se deformó.** En la página de login la "P" del logo quedó más grande que el círculo de fondo. Revisar el tamaño/escala del SVG o la fuente del logo y que la P quede contenida y centrada dentro del círculo.
 - [x] **Mejorar la interfaz de creación de mesas (Poker, Truco, Uno y las que apliquen).** A simple vista no se entiende qué hay que hacer: falta guiar el flujo (crear mesa → sumar bots/invitar → iniciar), explicar cada campo (entrada, jugadores, privada/código) y dejar clara la acción principal.
+- [x] **Lobby de mesas: los botones quedan lejos.** En el lobby para armar mesas (Crear mesa, y en la sala de espera Agregar/Quitar bot y Empezar) los botones siguen lejos del pulgar/de la vista. Fijarlos abajo (pinned) como en los juegos, con la clase `dock`.
 
 ## Tiempo real
 Mesas, reconexión, latencia.
