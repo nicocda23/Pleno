@@ -5,6 +5,7 @@ import type { CrashBet, CrashRound } from "../api/types";
 import { Confetti } from "../components/Confetti";
 import { CrashCanvas } from "../components/CrashCanvas";
 import { useToasts } from "../components/Toasts";
+import { StakePicker } from "../components/StakePicker";
 import { crashView, formatMultiplier, parseAutoCashOut, type RoundVerification, verifyRound } from "../lib/crash";
 import { formatChips } from "../lib/format";
 import { errorMessage, failureMessage } from "../lib/messages";
@@ -150,17 +151,7 @@ export function Crash() {
 
         <section className="card" aria-labelledby="apuesta">
           <h2 id="apuesta" className="section-title">Tu apuesta</h2>
-          <div className="chips" role="radiogroup" aria-label="Fichas a apostar">
-            {CHIPS.filter((value) => value <= (data?.maxStake ?? 10_000)).map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={stake === value} disabled={myBetInThisRound} className={`choice choice--stake ${stake === value ? "choice--on" : ""}`} onClick={() => setStake(value)}>
-                {formatChips(value)}
-              </button>
-            ))}
-          </div>
-          <label className="field">
-            <span>Otro monto</span>
-            <input type="number" inputMode="numeric" min={data?.minStake ?? 1} max={data?.maxStake ?? 10_000} step={1} value={stake} disabled={myBetInThisRound} aria-invalid={!stakeValid} onChange={(e) => setStake(Math.trunc(Number(e.target.value)))} />
-          </label>
+          <StakePicker stake={stake} onChange={setStake} chips={CHIPS} min={data?.minStake ?? 1} max={data?.maxStake ?? 10_000} defaultStake={10} disabled={myBetInThisRound} />
           <label className="field">
             <span>Retiro automático en (opcional, de 1,01 a 1000)</span>
             <input type="text" inputMode="decimal" placeholder="por ejemplo 2,5" value={auto} disabled={myBetInThisRound} aria-invalid={!autoValid} onChange={(e) => setAuto(e.target.value)} />

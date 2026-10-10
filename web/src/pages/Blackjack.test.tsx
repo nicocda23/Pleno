@@ -102,8 +102,8 @@ describe("Blackjack", () => {
     await sit(apiWith({ current: state(round()) }));
 
     expect(await screen.findByText(/Apuestas abiertas: cierran en \d+ s/)).toBeInTheDocument();
-    await userEvent.clear(screen.getByLabelText("Otro monto"));
-    await userEvent.type(screen.getByLabelText("Otro monto"), "500");
+    await userEvent.clear(screen.getByLabelText(/Otro monto/));
+    await userEvent.type(screen.getByLabelText(/Otro monto/), "500");
     expect(await screen.findByText(/la apuesta va de 1 a 100 fichas/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sentarme y apostar" })).toBeDisabled();
   });

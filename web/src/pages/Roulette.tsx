@@ -6,6 +6,7 @@ import { Confetti } from "../components/Confetti";
 import { Pocket } from "../components/Pocket";
 import { useToasts } from "../components/Toasts";
 import { WheelCanvas } from "../components/WheelCanvas";
+import { StakePicker } from "../components/StakePicker";
 import { aggregateChips, totalStake, type ChipDrop, type Spot } from "../lib/board";
 import { formatChips } from "../lib/format";
 import { errorMessage, failureMessage } from "../lib/messages";
@@ -222,13 +223,7 @@ export function Roulette() {
       <div className="table-grid">
         <section className="card" aria-labelledby="apuesta">
           <h2 id="apuesta" className="section-title">1. Elegí una ficha y tocá el tapete</h2>
-          <div className="chips" role="radiogroup" aria-label="Valor de la ficha">
-            {CHIPS.map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={chip === value} className={`choice choice--stake ${chip === value ? "choice--on" : ""}`} onClick={() => setChip(value)}>
-                {formatChips(value)}
-              </button>
-            ))}
-          </div>
+          <StakePicker stake={chip} onChange={setChip} chips={CHIPS} min={1} max={Number.MAX_SAFE_INTEGER} allowCustom={false} label="Valor de la ficha" />
 
           <Board placed={placed} disabled={spinning} winning={result?.status === "Settled" ? result.winningNumber : null} onPick={pick} onRemove={unpick} />
 

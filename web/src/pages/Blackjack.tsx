@@ -4,6 +4,7 @@ import { ApiError } from "../api/client";
 import { queryKeys, useBlackjackAction, useBlackjackTable, useBlackjackTables, usePlaceBlackjackBet } from "../api/hooks";
 import type { BlackjackRound, BlackjackSeat, BlackjackTable } from "../api/types";
 import { Confetti } from "../components/Confetti";
+import { StakePicker } from "../components/StakePicker";
 import { cardFace, describeHand, handText, type HandVerification, isWin, resultText, verifyHand } from "../lib/blackjack";
 import { formatChips } from "../lib/format";
 import { errorMessage } from "../lib/messages";
@@ -263,17 +264,7 @@ function TableView({ tableId, onLeave }: { tableId: string; onLeave: () => void 
           ) : (
             <>
               <p className="muted">Apuesta de {formatChips(min)} a {formatChips(max)} fichas.</p>
-              <div className="chips" role="radiogroup" aria-label="Fichas a apostar">
-                {CHIPS.filter((value) => value >= min && value <= max).map((value) => (
-                  <button key={value} type="button" role="radio" aria-checked={stake === value} disabled={!bettingOpen} className={`choice choice--stake ${stake === value ? "choice--on" : ""}`} onClick={() => setStakeInput(value)}>
-                    {formatChips(value)}
-                  </button>
-                ))}
-              </div>
-              <label className="field">
-                <span>Otro monto</span>
-                <input type="number" inputMode="numeric" min={min} max={max} step={1} value={stake} disabled={!bettingOpen} aria-invalid={!stakeValid} onChange={(e) => setStakeInput(Math.trunc(Number(e.target.value)))} />
-              </label>
+              <StakePicker stake={stake} onChange={setStakeInput} chips={CHIPS} min={min} max={max} defaultStake={Math.min(max, Math.max(min, 10))} disabled={!bettingOpen} />
               {!stakeValid && <p className="notice notice--error" role="alert">En esta mesa la apuesta va de {formatChips(min)} a {formatChips(max)} fichas.</p>}
               {stakeValid && stake > balance.available && balance.ready && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa apuesta.</p>}
               <label className="tl-check">
