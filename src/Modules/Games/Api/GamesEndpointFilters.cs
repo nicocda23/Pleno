@@ -21,7 +21,7 @@ public static class GamesEndpointFilters
             {
                 GamesError.RoundNotFound or GamesError.TableNotFound => StatusCodes.Status404NotFound,
                 GamesError.BetKeyReused or GamesError.SettingsConflict or GamesError.BettingClosed or GamesError.RoundNotRunning
-                    or GamesError.CrashedAlready or GamesError.BetNotActive or GamesError.NotYourTurn or GamesError.AlreadySeated => StatusCodes.Status409Conflict,
+                    or GamesError.CrashedAlready or GamesError.BetNotActive or GamesError.NotYourTurn or GamesError.AlreadySeated or GamesError.TableClosed => StatusCodes.Status409Conflict,
                 _ => StatusCodes.Status400BadRequest,
             };
             return Results.Problem(statusCode: status, title: ex.Error.ToString(), detail: ex.Message);

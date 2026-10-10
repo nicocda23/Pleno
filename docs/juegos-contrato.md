@@ -48,6 +48,10 @@ Un juego de mesas (Blackjack) es el mismo contrato con varias partidas simultane
 motor con un ciclo por mesa. Cada apuesta (cada asiento) sigue el protocolo de rondas con la Wallet por su cuenta. El aviso en vivo (`GameBroadcast`) solo dice "la mesa
 cambio": el navegador vuelve a pedir el estado, que arma el servidor sin la carta tapada. Ver `docs/juego-blackjack.md` y el ADR 0010.
 
+## Juegos de mesas entre jugadores (ejemplo: Uno)
+Uno, Truco y Poker se escriben como una maquina de estados pura (`ITableGame`) sobre la plataforma `Games.Tables`, que pone las mesas, los bots, los turnos, las fichas y los endpoints.
+Ver `docs/juegos-mesas.md` y el ADR 0012.
+
 ## Un juego en su propio proceso
 El servicio de juegos es un solo programa que carga los modulos habilitados. Si un juego necesita su propio proceso (por ejemplo uno en vivo
 y compartido), se levanta el mismo programa con `Games:Enabled` = ese juego y se enruta por el gateway. Cada despliegue tiene su `gamesdb`.

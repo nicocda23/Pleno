@@ -15,7 +15,7 @@ public sealed class ReserveStakeHandler(WalletService wallet)
     /// <summary>Limites del plazo que un juego puede pedir: ni una reserva eterna ni una que venza antes de poder liquidarse.</summary>
     public const int MinTtlSeconds = 1;
 
-    public const int MaxTtlSeconds = 900;
+    public const int MaxTtlSeconds = 3_600;
 
     public async Task<StakeRejected?> Handle(ReserveStake command, CancellationToken ct)
     {

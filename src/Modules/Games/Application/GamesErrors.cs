@@ -31,6 +31,12 @@ public enum GamesError
 
     /// <summary>El jugador ya tiene una apuesta en esta mano de la mesa.</summary>
     AlreadySeated,
+
+    /// <summary>La mesa no esta en el estado que la operacion necesita (ya empezo, termino, esta llena...).</summary>
+    TableClosed,
+
+    /// <summary>La jugada no es valida segun las reglas del juego.</summary>
+    InvalidAction,
 }
 
 public sealed class GamesDomainException(GamesError error, string message) : Exception(message)

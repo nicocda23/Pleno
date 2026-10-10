@@ -167,6 +167,7 @@ public static class TestAuth
             // El motor de Crash no corre solo en las pruebas (daria rondas y mensajes de fondo a todos los tests): las que lo necesitan lo prenden.
             builder.UseSetting("Crash:EngineEnabled", "false");
             builder.UseSetting("Blackjack:EngineEnabled", "false");
+            builder.UseSetting("Tables:EngineEnabled", "false");
             if (rabbit is not null)
             {
                 builder.UseSetting("ConnectionStrings:rabbitmq", rabbit.ConnectionString);
