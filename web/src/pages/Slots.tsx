@@ -4,6 +4,7 @@ import type { Paytable, Spin } from "../api/types";
 import { Confetti } from "../components/Confetti";
 import { SlotSymbol } from "../components/SlotSymbol";
 import { useToasts } from "../components/Toasts";
+import { StakePicker } from "../components/StakePicker";
 import { formatChips } from "../lib/format";
 import { errorMessage, failureMessage } from "../lib/messages";
 import { ReelsModel } from "../lib/reels";
@@ -43,7 +44,6 @@ function Machine({ paytable }: { paytable: Paytable }) {
   const defaultStake = Math.min(10, paytable.maxStake);
   const [stake, setStake] = useState(defaultStake);
   // Texto del campo "Otro": vacio mientras se usa una ficha rapida; con contenido cuando el monto es personalizado.
-  const [custom, setCustom] = useState("");
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<Spin | null>(null);
@@ -272,26 +272,7 @@ function Machine({ paytable }: { paytable: Paytable }) {
           <ReelsView model={model} names={names} phase={phase} label={label} theme={theme} cascade={cascade} win={!spinning && result?.status === "Settled" && (result.payout ?? 0) > result.stake ? result : null} />
 
           <h3 className="section-subtitle">Cuántas fichas</h3>
-          <div className="chips chips--stake" role="radiogroup" aria-label="Fichas a apostar">
-            {CHIPS.filter((value) => value <= paytable.maxStake).map((value) => (
-              <button key={value} type="button" role="radio" aria-checked={stake === value} disabled={spinning || auto > 0} className={`choice choice--stake ${stake === value ? "choice--on" : ""}`} onClick={() => {
-                setStake(value);
-                setCustom("");
-              }}>
-                {formatChips(value)}
-              </button>
-            ))}
-            <input
-              className={`chip-input ${custom === "" ? "" : "chip-input--on"}`}
-              type="number" inputMode="numeric" min={paytable.minStake} max={paytable.maxStake} step={1}
-              placeholder="✎" aria-label={`Otro monto (${formatChips(paytable.minStake)} a ${formatChips(paytable.maxStake)})`}
-              value={custom} disabled={spinning || auto > 0} aria-invalid={custom !== "" && !stakeValid}
-              onChange={(e) => {
-                setCustom(e.target.value);
-                setStake(e.target.value === "" ? defaultStake : Math.trunc(Number(e.target.value)));
-              }}
-            />
-          </div>
+          <StakePicker stake={stake} onChange={setStake} chips={CHIPS} min={paytable.minStake} max={paytable.maxStake} defaultStake={defaultStake} disabled={spinning || auto > 0} />
 
           {stake > balance.available && balance.ready && stakeValid && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa apuesta.</p>}
           {error && <p className="notice notice--error" role="alert">{error}</p>}

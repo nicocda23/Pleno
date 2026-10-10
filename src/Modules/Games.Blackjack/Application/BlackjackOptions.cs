@@ -21,16 +21,16 @@ public sealed class BlackjackTableConfig
 public sealed class BlackjackOptions
 {
     /// <summary>Cuanto dura la ventana de apuestas desde la primera apuesta de la mano.</summary>
-    public double BettingSeconds { get; set; } = 10;
+    public double BettingSeconds { get; set; } = 7;
 
     /// <summary>Cuanto tiene cada jugador para decidir en su turno (si no actua, se planta).</summary>
     public double TurnSeconds { get; set; } = 15;
 
     /// <summary>Pausa entre que termina una mano y se abre la siguiente.</summary>
-    public double PauseSeconds { get; set; } = 5;
+    public double PauseSeconds { get; set; } = 3;
 
     /// <summary>Cuanto tarda el crupier entre carta y carta (para que se pueda seguir).</summary>
-    public int DealerStepMilliseconds { get; set; } = 800;
+    public int DealerStepMilliseconds { get; set; } = 500;
 
     /// <summary>Asientos por mesa.</summary>
     public int MaxSeats { get; set; } = 5;

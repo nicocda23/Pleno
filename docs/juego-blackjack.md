@@ -67,6 +67,6 @@ de nadie; solo tu propio asiento trae tu `betId`. El aviso en vivo no lleva cart
 | `GET /rounds/{id}` | Datos públicos de la mano para verificar: antes de terminar solo el compromiso; después, la semilla |
 
 ## Configuración (sección `Blackjack`)
-`BettingSeconds` (10), `TurnSeconds` (15), `PauseSeconds` (5), `DealerStepMilliseconds` (800), `MaxSeats` (5), `EngineEnabled` (true) y `Tables`
+`BettingSeconds` (7), `TurnSeconds` (15), `PauseSeconds` (3), `DealerStepMilliseconds` (500), `MaxSeats` (5), `EngineEnabled` (true) y `Tables`
 (lista de `{ Id, Name, MinStake, MaxStake }`; por defecto `mesa-1` de 1 a 100, `mesa-2` de 10 a 1.000 y `mesa-3` de 100 a 10.000). Se valida al arrancar.
 **El motor de mesas tiene que correr en UNA sola instancia** del servicio de juegos (`EngineEnabled`); las pruebas lo apagan y corren una mano a la vez.

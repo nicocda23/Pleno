@@ -44,10 +44,10 @@ function Rules() {
 }
 
 /** Una carta con CSS: sin imagenes. Con `onClick` es un boton; sin el, una imagen para lectores de pantalla. */
-function UnoCard({ card, label, onClick, disabled, playable, dimmed, size = "md" }: { card: number; label?: string; onClick?: () => void; disabled?: boolean; playable?: boolean; dimmed?: boolean; size?: "md" | "lg" }) {
+function UnoCard({ card, label, onClick, disabled, playable, dimmed, drawnIndex, size = "md" }: { card: number; label?: string; onClick?: () => void; disabled?: boolean; playable?: boolean; dimmed?: boolean; drawnIndex?: number; size?: "md" | "lg" }) {
   const info = decodeCard(card);
-  const style = { "--uno-bg": info.color === null ? undefined : COLOR_CSS[info.color], "--uno-fg": textOn(info.color) } as CSSProperties;
-  const classes = ["uno-card", `uno-card--${size}`, info.color === null ? "uno-card--wild" : "", playable ? "uno-card--playable" : "", dimmed ? "uno-card--dim" : ""].filter(Boolean).join(" ");
+  const style = { "--uno-bg": info.color === null ? undefined : COLOR_CSS[info.color], "--uno-fg": textOn(info.color), "--draw-delay": drawnIndex === undefined ? undefined : `${drawnIndex * 120}ms` } as CSSProperties;
+  const classes = ["uno-card", `uno-card--${size}`, info.color === null ? "uno-card--wild" : "", playable ? "uno-card--playable" : "", dimmed ? "uno-card--dim" : "", drawnIndex !== undefined ? "uno-card--drawn" : ""].filter(Boolean).join(" ");
   const face = (
     <>
       <span className="uno-card__corner" aria-hidden="true">{info.symbol}</span>
@@ -82,6 +82,9 @@ function UnoTable({ table, onLeave }: { table: LiveTable<UnoView>; onLeave: () =
   const [sawPlaying, setSawPlaying] = useState(false);
   const [winClosed, setWinClosed] = useState(false);
   const [verification, setVerification] = useState<Verification>(null);
+  const [handKey, setHandKey] = useState<string | null>(null);
+  const [prevHand, setPrevHand] = useState<number[] | null>(null);
+  const [freshCards, setFreshCards] = useState<number[]>([]);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 250);
@@ -106,6 +109,14 @@ function UnoTable({ table, onLeave }: { table: LiveTable<UnoView>; onLeave: () =
     if (celebrate) playWinSound();
   }, [celebrate]);
 
+  // Las cartas que aparecen en la mano despues de la primera vez son robadas: se animan saliendo del mazo (la primera carga no anima).
+  const currentHand = game?.hand;
+  if (currentHand && currentHand.join(",") !== handKey) {
+    setHandKey(currentHand.join(","));
+    setPrevHand(currentHand);
+    setFreshCards(prevHand === null ? [] : currentHand.filter((c) => !prevHand.includes(c)));
+  }
+
   const nameOf = (seat: number): string => table.seats.find((s) => s.seat === seat)?.name ?? `Asiento ${seat + 1}`;
   const serverNow = now + table.offsetMs;
 
@@ -115,6 +126,8 @@ function UnoTable({ table, onLeave }: { table: LiveTable<UnoView>; onLeave: () =
   const turnSeconds = secondsUntil(table.turnEndsAt, serverNow);
   const hand = [...game.hand].sort((a, b) => a - b);
   const mustPlayOrPass = myTurn && game.drawnCard !== null;
+  const mustDraw = myTurn && game.playable.length === 0 && game.drawnCard === null;
+  const pileLevel = game.drawCount <= 5 ? "low" : game.drawCount <= 20 ? "mid" : "full";
   const others = game.players.filter((p) => p.seat !== mySeat).sort((a, b) => a.seat - b.seat);
   const unoSeats = table.status === "Playing" ? game.players.filter((p) => p.cards === 1).map((p) => p.seat) : [];
 
@@ -147,6 +160,11 @@ function UnoTable({ table, onLeave }: { table: LiveTable<UnoView>; onLeave: () =
           <p className="muted">Entrada de {formatChips(table.buyIn)} fichas · en juego {formatChips(table.buyIn * table.seats.length)}</p>
         </div>
         <p role="status" className="crash-status" data-testid="uno-status">{statusLabel}</p>
+        {mustDraw && (
+          <p role="status" className="uno-alert uno-alert--draw" data-testid="uno-draw-alert">
+            No tenés nada para jugar: tocá el mazo para robar.
+          </p>
+        )}
         {unoSeats.length > 0 && (
           <p role="status" className="uno-alert" data-testid="uno-alert">
             {unoSeats.map((seat) => `${seat === mySeat ? "Quedaste con una carta" : `${nameOf(seat)} quedó con una carta`}`).join(" · ")}: ¡Uno!
@@ -162,12 +180,15 @@ function UnoTable({ table, onLeave }: { table: LiveTable<UnoView>; onLeave: () =
           </ul>
 
           <div className="uno-center">
-            <button type="button" className="uno-pile" aria-label="Robar carta" disabled={!myTurn || game.drawnCard !== null || act.isPending} onClick={() => send({ type: "draw" })}>
+            <button type="button" className={`uno-pile ${mustDraw ? "uno-pile--call" : ""}`} data-level={pileLevel} aria-label="Robar carta" disabled={!myTurn || game.drawnCard !== null || act.isPending} onClick={() => send({ type: "draw" })}>
               <span className="uno-pile__back" aria-hidden="true">UNO</span>
               <span className="uno-pile__count">{game.drawCount} en el mazo</span>
+              {mustDraw && <span className="uno-pile__hint" aria-hidden="true">¡Tocá para robar!</span>}
             </button>
             <div className="uno-top">
-              <UnoCard card={game.top} size="lg" label={`Carta de arriba: ${decodeCard(game.top).label}`} />
+              <span className="uno-discard">
+                <UnoCard card={game.top} size="lg" label={`Carta de arriba: ${decodeCard(game.top).label}`} />
+              </span>
               <p className="uno-color" data-testid="uno-color">
                 <span className="uno-color__dot" style={{ background: COLOR_CSS[game.topColor] }} aria-hidden="true" />
                 Color en juego: <strong>{colorName(game.topColor)}</strong>
@@ -186,11 +207,13 @@ function UnoTable({ table, onLeave }: { table: LiveTable<UnoView>; onLeave: () =
               </p>
               <div className="uno-hand" data-testid="uno-hand" role="group" aria-label="Tu mano">
                 {hand.map((card) => {
+                  const fresh = freshCards.includes(card);
                   const playable = myTurn && game.playable.includes(card);
                   return (
                     <UnoCard
                       key={card}
                       card={card}
+                      drawnIndex={fresh ? freshCards.indexOf(card) : undefined}
                       playable={playable}
                       dimmed={!playable && table.status === "Playing"}
                       disabled={!playable || act.isPending}
@@ -294,6 +317,12 @@ function UnoTable({ table, onLeave }: { table: LiveTable<UnoView>; onLeave: () =
 
 function OpponentView({ seat, cards, active, turnSeconds, winner }: { seat: TableSeat | undefined; cards: number; active: boolean; turnSeconds: number; winner: boolean }) {
   const name = seat?.name ?? "Jugador";
+  const [prev, setPrev] = useState(cards);
+  const [gained, setGained] = useState(0);
+  if (cards !== prev) {
+    setPrev(cards);
+    setGained(cards > prev ? Math.min(cards - prev, 4) : 0);
+  }
   const classes = ["uno-opp", active ? "uno-opp--active" : "", winner ? "uno-opp--winner" : ""].filter(Boolean).join(" ");
   return (
     <li className={classes} aria-current={active ? "true" : undefined} data-testid="uno-opp">
@@ -303,6 +332,9 @@ function OpponentView({ seat, cards, active, turnSeconds, winner }: { seat: Tabl
       </p>
       <p className="uno-opp__cards" aria-label={`${cards} ${cards === 1 ? "carta" : "cartas"}`}>
         <span className="uno-opp__back" aria-hidden="true">{cards}</span>
+        {Array.from({ length: gained }, (_, i) => (
+          <span key={`${cards}-${i}`} className="uno-opp__flying" style={{ "--draw-delay": `${i * 120}ms` } as CSSProperties} aria-hidden="true" />
+        ))}
         <span className="muted">{cards === 1 ? "carta" : "cartas"}</span>
       </p>
       {seat?.isBot && <p className="uno-opp__tag">Bot</p>}

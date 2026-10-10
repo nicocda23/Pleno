@@ -79,12 +79,31 @@ describe("Blackjack", () => {
     expect(placeCalls(api)[0]!.headers?.["Idempotency-Key"]).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it("places the bet by itself when the repeat option is on, only once per hand", async () => {
+    let attempt = 0;
+    const scenario: Scenario = { current: state(round({ bettingEndsAt: null })) };
+    const api = apiWith(scenario, {
+      "POST /games/blackjack/tables/mesa-1/bets": () => {
+        attempt += 1;
+        if (attempt === 2) throw new ApiError(409, "BettingClosed", "x");
+        return { betId: BET_ID, roundId: ROUND_ID, alreadyPlaced: false };
+      },
+    });
+    await sit(api);
+
+    await userEvent.click(await screen.findByRole("radio", { name: "50" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Repetir la apuesta en cada mano" }));
+
+    await waitFor(() => expect(placeCalls(api)).toHaveLength(1)); // se activa y apuesta sola
+    expect(placeCalls(api)[0]!.body).toEqual({ stake: 50 });
+  });
+
   it("shows the betting countdown and refuses an amount out of range or above the balance", async () => {
     await sit(apiWith({ current: state(round()) }));
 
     expect(await screen.findByText(/Apuestas abiertas: cierran en \d+ s/)).toBeInTheDocument();
-    await userEvent.clear(screen.getByLabelText("Otro monto"));
-    await userEvent.type(screen.getByLabelText("Otro monto"), "500");
+    await userEvent.clear(screen.getByLabelText(/Otro monto/));
+    await userEvent.type(screen.getByLabelText(/Otro monto/), "500");
     expect(await screen.findByText(/la apuesta va de 1 a 100 fichas/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sentarme y apostar" })).toBeDisabled();
   });

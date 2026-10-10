@@ -93,8 +93,8 @@ describe("Crash", () => {
 
     await userEvent.clear(screen.getByLabelText(/Retiro automático/));
     await userEvent.click(screen.getByRole("radio", { name: "500" }));
-    await userEvent.clear(screen.getByLabelText("Otro monto"));
-    await userEvent.type(screen.getByLabelText("Otro monto"), "5000");
+    await userEvent.clear(screen.getByLabelText(/Otro monto/));
+    await userEvent.type(screen.getByLabelText(/Otro monto/), "5000");
     expect(await screen.findByText(/No te alcanzan las fichas/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Apostar/ })).toBeDisabled();
   });

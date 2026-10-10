@@ -4,6 +4,7 @@ import { ApiError } from "../api/client";
 import { queryKeys, useBlackjackAction, useBlackjackTable, useBlackjackTables, usePlaceBlackjackBet } from "../api/hooks";
 import type { BlackjackRound, BlackjackSeat, BlackjackTable } from "../api/types";
 import { Confetti } from "../components/Confetti";
+import { StakePicker } from "../components/StakePicker";
 import { cardFace, describeHand, handText, type HandVerification, isWin, resultText, verifyHand } from "../lib/blackjack";
 import { formatChips } from "../lib/format";
 import { errorMessage } from "../lib/messages";
@@ -112,6 +113,7 @@ function TableView({ tableId, onLeave }: { tableId: string; onLeave: () => void 
   const mine = seats.find((s) => s.mine) ?? null;
 
   const [stakeInput, setStakeInput] = useState<number | null>(null);
+  const [autoRepeat, setAutoRepeat] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [win, setWin] = useState<BlackjackSeat | null>(null);
@@ -171,12 +173,30 @@ function TableView({ tableId, onLeave }: { tableId: string; onLeave: () => void 
       pending.current = null; // aceptada: la proxima apuesta usa otra clave
     } catch (e) {
       setError(tableError(e));
+      setAutoRepeat(false); // ante un error no se sigue apostando solo
       // Error definitivo: proxima apuesta con clave nueva. Si fue de red, se conserva para reintentar sin duplicar.
       if (e instanceof ApiError && e.status !== 0) pending.current = null;
     } finally {
       void queryClient.invalidateQueries({ queryKey: queryKeys.blackjackTable(tableId) });
     }
   };
+
+  // Apuesta repetida: apenas se abre la mano siguiente se repite la apuesta anterior (se corta sola si falla o no alcanzan las fichas).
+  // Una sola vez por mano (aunque el estado tarde en mostrarte sentado, no se apuesta dos veces).
+  const submitRef = useRef(submit);
+  const autoBetHand = useRef<string | null>(null);
+  const handId = round?.id ?? "none";
+  useEffect(() => {
+    submitRef.current = submit;
+  });
+  useEffect(() => {
+    if (!autoRepeat || !canBet || autoBetHand.current === handId) return;
+    const id = window.setTimeout(() => {
+      autoBetHand.current = handId;
+      void submitRef.current();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [autoRepeat, canBet, handId]);
 
   const play = (action: "hit" | "stand") => {
     if (!mine?.betId) return;
@@ -244,19 +264,13 @@ function TableView({ tableId, onLeave }: { tableId: string; onLeave: () => void 
           ) : (
             <>
               <p className="muted">Apuesta de {formatChips(min)} a {formatChips(max)} fichas.</p>
-              <div className="chips" role="radiogroup" aria-label="Fichas a apostar">
-                {CHIPS.filter((value) => value >= min && value <= max).map((value) => (
-                  <button key={value} type="button" role="radio" aria-checked={stake === value} disabled={!bettingOpen} className={`choice choice--stake ${stake === value ? "choice--on" : ""}`} onClick={() => setStakeInput(value)}>
-                    {formatChips(value)}
-                  </button>
-                ))}
-              </div>
-              <label className="field">
-                <span>Otro monto</span>
-                <input type="number" inputMode="numeric" min={min} max={max} step={1} value={stake} disabled={!bettingOpen} aria-invalid={!stakeValid} onChange={(e) => setStakeInput(Math.trunc(Number(e.target.value)))} />
-              </label>
+              <StakePicker stake={stake} onChange={setStakeInput} chips={CHIPS} min={min} max={max} defaultStake={Math.min(max, Math.max(min, 10))} disabled={!bettingOpen} />
               {!stakeValid && <p className="notice notice--error" role="alert">En esta mesa la apuesta va de {formatChips(min)} a {formatChips(max)} fichas.</p>}
               {stakeValid && stake > balance.available && balance.ready && <p className="notice notice--error" role="alert">No te alcanzan las fichas para esa apuesta.</p>}
+              <label className="tl-check">
+                <input type="checkbox" checked={autoRepeat} onChange={(e) => setAutoRepeat(e.target.checked)} />
+                <span>Repetir la apuesta en cada mano</span>
+              </label>
               <div className="dock">
                 <button type="button" className="btn btn--gold btn--lg btn--block" disabled={!canBet} onClick={() => void submit()}>
                   {placeBet.isPending ? "Enviando…" : "Sentarme y apostar"}
