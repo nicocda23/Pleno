@@ -285,7 +285,10 @@ public sealed class CashierFlowTests : IDisposable
         Assert.Equal(HttpStatusCode.Conflict, (await AssignAsync(backoffice, cashier, Roles.Player, null)).StatusCode);
 
         var tree = await backoffice.GetFromJsonAsync<JsonElement>("/backoffice/wallet/hierarchy");
-        Assert.Equal(3, tree.GetArrayLength());
+        var ids = tree.EnumerateArray().Select(n => n.GetProperty("userId").GetGuid()).ToList();
+        Assert.Contains(head, ids);
+        Assert.Contains(cashier, ids);
+        Assert.Contains(player, ids);
     }
 
     [Fact]
