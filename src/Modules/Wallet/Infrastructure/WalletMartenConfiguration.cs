@@ -39,6 +39,8 @@ public static class WalletMartenConfiguration
         options.Schema.For<AuditEntry>().Index(e => e.OccurredAt);
         options.Schema.For<HierarchyNode>().Identity(n => n.Id);
         options.Schema.For<HierarchyNode>().Index(n => n.ParentUserId);
+        options.Schema.For<CommissionRecord>().Identity(c => c.Id);
+        options.Schema.For<CommissionRecord>().Index(c => c.OccurredAt);
     }
 }
 

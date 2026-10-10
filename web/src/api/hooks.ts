@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "./ApiProvider";
 import { ApiError } from "./client";
-import type { Account, CashierMe, CashierTransfer, HierarchyLevel, HierarchyNode, JurisdictionMember, CreateTableBody, TableCreated, TableRules, TableState, TableSummary, BlackjackBet, BlackjackTable, BlackjackTableState, CrashBet, CrashCashOut, CrashState, GameInfo, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
+import type { Account, LoadChipsResult, CashierMe, CashierTransfer, HierarchyLevel, HierarchyNode, JurisdictionMember, CreateTableBody, TableCreated, TableRules, TableState, TableSummary, BlackjackBet, BlackjackTable, BlackjackTableState, CrashBet, CrashCashOut, CrashState, GameInfo, SlotsSettings, SlotsSettingsBody, SlotsSettingsHistoryItem, SlotsSettingsPreview, CreditFilter, CreditHistory, MovementsPage, AuditEntry, CreditResult, FairnessInfo, Me, Paytable, PlaceBetBody, PlacedBet, Round, Spin, UserSummary } from "./types";
 
 export const queryKeys = {
   spinsAll: ["spins"] as const,
@@ -461,7 +461,7 @@ export function useLoadChips() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ toUserId, amount, idempotencyKey }: { toUserId: string; amount: number; idempotencyKey: string }) =>
-      api.post<CreditResult>("/cashier/transfers", { toUserId, amount }, { "Idempotency-Key": idempotencyKey }),
+      api.post<LoadChipsResult>("/cashier/transfers", { toUserId, amount }, { "Idempotency-Key": idempotencyKey }),
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.cashierMembers }),

@@ -29,6 +29,9 @@ public enum MovementKind
 
     /// <summary>Fichas enviadas a otro jugador.</summary>
     TransferOut = 8,
+
+    /// <summary>Comision que paga la casa por una carga hecha a alguien de tu jurisdiccion.</summary>
+    Commission = 9,
 }
 
 /// <summary>
@@ -101,6 +104,7 @@ public sealed partial class WalletService
     {
         ChipsTransferred => delta > 0 ? MovementKind.TransferIn : MovementKind.TransferOut,
         ChipsCredited c when c.IdempotencyKey == "welcome-bonus" => MovementKind.WelcomeBonus,
+        ChipsCredited c when c.IdempotencyKey.StartsWith("commission:", StringComparison.Ordinal) => MovementKind.Commission,
         ChipsCredited => MovementKind.Credit,
         BetReserved => MovementKind.Stake,
         BetSettled => MovementKind.Prize,
