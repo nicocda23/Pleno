@@ -1,5 +1,5 @@
 import type { TrucoEvent } from "../api/types";
-import { MANO_NAMES, actionLabel, byStrength, decodeCard, eventText, groupOf, pendingText, pileSpot, playBody, strengthOf, trucoWorth } from "./truco";
+import { MANO_NAMES, actionLabel, bannerFor, byStrength, decodeCard, eventText, groupOf, newEvents, pendingText, pileSpot, playBody, strengthOf, trucoWorth } from "./truco";
 
 const nameOf = (seat: number) => (seat === 0 ? "Jugador 1" : "Bot 2");
 const ev = (e: Partial<TrucoEvent> & Pick<TrucoEvent, "seat" | "kind">): TrucoEvent => ({ card: null, value: null, a: null, b: null, ...e });
@@ -97,5 +97,41 @@ describe("la pila de cartas de la mesa", () => {
     expect(new Set(rotations).size).toBeGreaterThan(3);
     expect(rotations.every((r) => Math.abs(r) <= 12)).toBe(true);
     expect(pileSpot(3)).toEqual(pileSpot(3));
+  });
+});
+
+describe("carteleria", () => {
+  const ev = (seat: number, kind: TrucoEvent["kind"], extra: Partial<TrucoEvent> = {}): TrucoEvent => ({ seat, kind, card: null, value: null, a: null, b: null, ...extra });
+  const name = (seat: number) => (seat === 0 ? "Ana" : "Bot 2");
+
+  it("finds the new events even when the server window slides", () => {
+    const a = ev(0, "play", { card: 1 });
+    const b = ev(1, "truco");
+    const c = ev(0, "quiero");
+    expect(newEvents([a], [a, b])).toEqual([b]);
+    expect(newEvents([a, b], [b, c])).toEqual([c]); // la ventana se corrio: salio a, entro c
+    expect(newEvents([a, b], [a, b])).toEqual([]);
+    expect(newEvents([], [a, b])).toEqual([a, b]);
+    expect(newEvents([a], [b, c])).toEqual([b, c]); // sin nada en comun: todo es nuevo
+  });
+
+  it("announces what the rival calls and answers from my point of view", () => {
+    expect(bannerFor(ev(1, "truco"), 0, name)).toMatchObject({ tone: "call", title: "¡TRUCO!", detail: "Bot 2 te cantó" });
+    expect(bannerFor(ev(0, "retruco"), 0, name)).toMatchObject({ title: "¡RETRUCO!", detail: "Cantaste vos" });
+    expect(bannerFor(ev(1, "quiero"), 0, name)).toMatchObject({ title: "¡QUIERO!", detail: "Bot 2 aceptó" });
+    expect(bannerFor(ev(1, "no_quiero"), 0, name)).toMatchObject({ tone: "good", title: "NO QUIERO" });
+    expect(bannerFor(ev(0, "no_quiero"), 0, name)).toMatchObject({ tone: "bad" });
+  });
+
+  it("tells who won each mano, the envido and the round, and stays neutral for a spectator", () => {
+    expect(bannerFor(ev(0, "baza"), 0, name)).toMatchObject({ tone: "good", title: "Ganaste la mano" });
+    expect(bannerFor(ev(1, "baza"), 0, name)).toMatchObject({ tone: "bad", title: "Perdiste la mano" });
+    expect(bannerFor(ev(-1, "parda"), 0, name)).toMatchObject({ tone: "info", title: "Parda" });
+    expect(bannerFor(ev(1, "envido_result", { value: 2, a: 26, b: 28 }), 0, name)).toMatchObject({ tone: "bad", title: "Perdiste el envido", detail: "(+2) · 26 a 28" });
+    expect(bannerFor(ev(0, "hand_end", { value: 3 }), 0, name)).toMatchObject({ tone: "good", title: "¡Ganaste la ronda!", detail: "+3 para vos" });
+    expect(bannerFor(ev(1, "hand_end", { value: 1 }), 0, name)).toMatchObject({ tone: "bad", title: "Perdiste la ronda" });
+    expect(bannerFor(ev(1, "hand_end", { value: 1 }), null, name)).toMatchObject({ tone: "info", title: "Ronda para Bot 2" });
+    expect(bannerFor(ev(0, "play", { card: 3 }), 0, name)).toBeNull();
+    expect(bannerFor(ev(0, "start"), 0, name)).toBeNull();
   });
 });

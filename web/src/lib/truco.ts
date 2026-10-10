@@ -184,3 +184,84 @@ export function pileSpot(index: number): PileSpot {
     rot: JITTER[index % JITTER.length]!,
   };
 }
+
+// ---- Carteleria: avisos grandes de lo que va pasando ----
+
+const sameEvent = (a: TrucoEvent, b: TrucoEvent): boolean => a.seat === b.seat && a.kind === b.kind && a.card === b.card && a.value === b.value && a.a === b.a && a.b === b.b;
+
+/**
+ * Los hechos que llegaron desde la ultima vez. El servidor manda solo los ultimos hechos (una ventana que se corre), asi que no alcanza con comparar
+ * cantidades: se busca cuanto de lo anterior sigue estando al principio de lo nuevo y lo que sobra es lo nuevo.
+ */
+export function newEvents(previous: readonly TrucoEvent[], next: readonly TrucoEvent[]): TrucoEvent[] {
+  for (let shift = 0; shift <= previous.length; shift += 1) {
+    const kept = previous.length - shift;
+    if (kept > next.length) continue;
+    let matches = true;
+    for (let i = 0; i < kept && matches; i += 1) matches = sameEvent(previous[shift + i]!, next[i]!);
+    if (matches) return next.slice(kept);
+  }
+  return [...next];
+}
+
+export type BannerTone = "call" | "good" | "bad" | "info";
+
+export interface Banner {
+  tone: BannerTone;
+  /** Lo grande: "¡TRUCO!", "¡QUIERO!", "Ganaste la ronda". */
+  title: string;
+  /** Quien y cuanto, en chico. */
+  detail: string;
+  /** Cuanto dura a la vista (ms). */
+  ms: number;
+}
+
+const SHOUT: Partial<Record<TrucoEvent["kind"], string>> = {
+  truco: "¡TRUCO!",
+  retruco: "¡RETRUCO!",
+  vale4: "¡VALE CUATRO!",
+  envido: "¡ENVIDO!",
+  real_envido: "¡REAL ENVIDO!",
+  falta_envido: "¡FALTA ENVIDO!",
+};
+
+/**
+ * El cartel de un hecho, desde el punto de vista de `mySeat` (null = mirando): lo que canta o responde el rival, quien gana cada mano, el envido y la ronda.
+ * Devuelve null para los hechos que no merecen cartel (repartir, tirar una carta).
+ */
+export function bannerFor(event: TrucoEvent, mySeat: number | null, nameOf: (seat: number) => string): Banner | null {
+  const mine = mySeat !== null && event.seat === mySeat;
+  const who = mine ? "Vos" : nameOf(event.seat);
+  const watching = mySeat === null;
+  switch (event.kind) {
+    case "truco":
+    case "retruco":
+    case "vale4":
+    case "envido":
+    case "real_envido":
+    case "falta_envido":
+      return { tone: "call", title: SHOUT[event.kind]!, detail: mine ? "Cantaste vos" : `${who} te cantó`, ms: 3_500 };
+    case "quiero":
+      return { tone: "call", title: "¡QUIERO!", detail: mine ? "Respondiste que sí" : `${who} aceptó`, ms: 3_000 };
+    case "no_quiero":
+      return { tone: watching ? "info" : mine ? "bad" : "good", title: "NO QUIERO", detail: mine ? "Respondiste que no" : `${who} no quiso: sumás los puntos`, ms: 3_500 };
+    case "mazo":
+      return { tone: watching ? "info" : mine ? "bad" : "good", title: "Al mazo", detail: mine ? "Te fuiste al mazo" : `${who} se fue al mazo`, ms: 3_500 };
+    case "baza":
+      return { tone: watching ? "info" : mine ? "good" : "bad", title: mine ? "Ganaste la mano" : watching ? `Ganó la mano ${who}` : "Perdiste la mano", detail: "", ms: 2_500 };
+    case "parda":
+      return { tone: "info", title: "Parda", detail: "La mano empató", ms: 2_500 };
+    case "envido_result": {
+      const mineWon = mine;
+      const points = event.value === null ? "" : ` (+${event.value})`;
+      const score = event.a !== null && event.b !== null && mySeat !== null ? ` · ${mySeat === 0 ? event.a : event.b} a ${mySeat === 0 ? event.b : event.a}` : "";
+      return { tone: watching ? "info" : mineWon ? "good" : "bad", title: mineWon ? "Ganaste el envido" : watching ? `Envido para ${who}` : "Perdiste el envido", detail: `${points}${score}`.trim(), ms: 4_500 };
+    }
+    case "hand_end": {
+      const points = event.value ?? 0;
+      return { tone: watching ? "info" : mine ? "good" : "bad", title: mine ? "¡Ganaste la ronda!" : watching ? `Ronda para ${who}` : "Perdiste la ronda", detail: `+${points} para ${mine ? "vos" : who}`, ms: 4_500 };
+    }
+    default:
+      return null;
+  }
+}
