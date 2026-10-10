@@ -317,6 +317,14 @@ public sealed class TablesFlowTests(PostgresFixture db, RabbitMqFixture rabbit) 
         Assert.Equal(HttpStatusCode.BadRequest, (await PostAsync(guest, tableId, "join")).StatusCode);
         Assert.Equal(HttpStatusCode.Accepted, (await PostAsync(guest, tableId, "join", new { code = code.ToLowerInvariant() })).StatusCode);
 
+        // Sin conocer el id: con solo el codigo se encuentra la mesa (en cualquier mayuscula/minuscula); uno equivocado no.
+        Assert.Equal(HttpStatusCode.BadRequest, (await stranger.PostAsJsonAsync("/games/uno/tables/join", new { code = "ZZZZZZ" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await stranger.PostAsJsonAsync("/games/uno/tables/join", new { code = "x" })).StatusCode);
+        var byCode = await stranger.PostAsJsonAsync("/games/uno/tables/join", new { code = code.ToLowerInvariant() });
+        Assert.Equal(HttpStatusCode.Accepted, byCode.StatusCode);
+        Assert.Equal(tableId, (await byCode.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("tableId").GetGuid());
+        Assert.Equal(3, (await ViewAsync(owner, tableId)).GetProperty("seats").GetArrayLength());
+
         var ownerView = await ViewAsync(owner, tableId);
         var guestView = await ViewAsync(guest, tableId);
         Assert.Equal(code, ownerView.GetProperty("joinCode").GetString());

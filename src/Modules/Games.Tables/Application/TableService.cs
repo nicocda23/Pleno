@@ -63,6 +63,7 @@ public sealed partial class TableService(
     private const int ConflictRetries = 5;
     private const int MissesBeforeAway = 3;
     private const int MaxNameLength = 40;
+    private const int JoinCodeLength = 6;
 
     private readonly Dictionary<string, ITableGame> _games = games.ToDictionary(g => g.Info.Id, StringComparer.Ordinal);
 
@@ -165,6 +166,23 @@ public sealed partial class TableService(
             await BroadcastAsync(outboxSession, table, now);
             await session.SaveChangesAsync(ct);
         });
+
+    /// <summary>Entra a una mesa privada con solo su codigo (la privada no se lista ni se revela: el codigo es la unica forma de encontrarla).</summary>
+    public async Task<Guid> JoinByCodeAsync(Guid userId, Guid accountId, string gameId, string code, CancellationToken ct = default)
+    {
+        GameOf(gameId);
+        var clean = code?.Trim().ToUpperInvariant() ?? string.Empty;
+        if (clean.Length != JoinCodeLength)
+        {
+            throw new GamesDomainException(GamesError.InvalidAction, "El codigo de la mesa no es correcto.");
+        }
+
+        await using var query = store.QuerySession();
+        var found = await query.Query<PlayerTable>().Where(t => t.GameId == gameId && t.IsPrivate && t.JoinCode == clean && t.Status == TableStatus.Open).FirstOrDefaultAsync(ct)
+            ?? throw new GamesDomainException(GamesError.InvalidAction, "El codigo de la mesa no es correcto.");
+        await JoinAsync(userId, accountId, found.Id, clean, ct);
+        return found.Id;
+    }
 
     /// <summary>Se va de una mesa que todavia no empezo (se devuelven las fichas). En plena partida no se puede: si no jugas, juega un bot por vos.</summary>
     public Task LeaveAsync(Guid userId, Guid tableId, CancellationToken ct = default) =>
@@ -707,7 +725,7 @@ public sealed partial class TableService(
         return clean.Length > MaxNameLength ? clean[..MaxNameLength] : clean;
     }
 
-    private static string NewJoinCode() => new([.. Enumerable.Range(0, 6).Select(_ => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[RandomNumberGenerator.GetInt32(32)])]);
+    private static string NewJoinCode() => new([.. Enumerable.Range(0, JoinCodeLength).Select(_ => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[RandomNumberGenerator.GetInt32(32)])]);
 
     private static string AadFor(Guid tableId) => $"table:{tableId:N}";
 

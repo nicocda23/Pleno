@@ -17,7 +17,16 @@ const ERRORS: Record<string, string> = {
   NotYourTurn: "No es tu turno (o se te acabó el tiempo).",
   AlreadySeated: "Ya tenés un asiento en esta mano.",
   TableNotFound: "Esa mesa no existe.",
+  RoundNotFound: "Esa mesa no existe o ya no está disponible.",
+  TableClosed: "La mesa ya no admite ese cambio (está llena, ya empezó o se cerró).",
+  InvalidAction: "Esa jugada no es válida.",
 };
+
+/** Como `errorMessage`, pero si el servidor mando un detalle en español (juegos de mesa) lo muestra en lugar del texto generico. */
+export function detailedErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 401 && error.message !== error.title && !error.message.startsWith("HTTP ") && error.title !== "NetworkError") return error.message;
+  return errorMessage(error);
+}
 
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return ERRORS[error.title] ?? "Algo salió mal. Intentá de nuevo.";

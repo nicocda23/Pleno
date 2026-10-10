@@ -52,6 +52,14 @@ internal static class TableEndpoints
         group.MapGet("/tables/{tableId:guid}", async (Guid tableId, HttpContext http, TableService tables, CancellationToken ct) =>
             Results.Ok(await tables.GetViewAsync(http.User.GetUserId(), tableId, ct)));
 
+        // Una mesa privada no se lista: se entra con su codigo y la respuesta dice a que mesa.
+        group.MapPost("/tables/join", async (JoinTableBody body, HttpContext http, TableService tables, CancellationToken ct) =>
+        {
+            var userId = http.User.GetUserId();
+            var tableId = await tables.JoinByCodeAsync(userId, PlayerIds.WalletAccountFor(userId), gameId, body.Code ?? string.Empty, ct);
+            return Results.Accepted($"/games/{gameId}/tables/{tableId}", new { tableId });
+        });
+
         group.MapPost("/tables/{tableId:guid}/join", async (Guid tableId, JoinTableBody? body, HttpContext http, TableService tables, CancellationToken ct) =>
         {
             var userId = http.User.GetUserId();
