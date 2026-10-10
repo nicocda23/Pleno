@@ -22,7 +22,7 @@ sus reglas. Complementa al [contrato de juegos](juegos-contrato.md) (y a las mes
 La plataforma ya trae sus tests de integración (mesas, fichas, ausentes, privadas, cancelación) con Uno como juego.
 
 ## Juegos
-- [Uno](juego-uno.md) · Truco y Poker (próximamente, sobre esta misma plataforma).
+- [Uno](juego-uno.md) · [Truco](juego-truco.md) · Poker (próximamente, sobre esta misma plataforma).
 
 ## Configuración (sección `Tables`)
 `BotThinkMilliseconds` (1.200), `OpenTableMinutes` (15), `ReservationSeconds` (3.600), `TickMilliseconds` (300) y `EngineEnabled` (true). **El motor tiene que correr en UNA sola
