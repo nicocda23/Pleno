@@ -7,6 +7,7 @@ public enum LedgerKind
     Settle = 3,
     Release = 4,
     Reversal = 5,
+    Transfer = 6,
 }
 
 /// <summary>Lo minimo que el agregado necesita recordar de una transaccion para poder revertirla.</summary>
