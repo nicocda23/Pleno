@@ -1,0 +1,72 @@
+import type { TrucoEvent } from "../api/types";
+import { actionLabel, byStrength, decodeCard, eventText, groupOf, pendingText, playBody, strengthOf, trucoWorth } from "./truco";
+
+const nameOf = (seat: number) => (seat === 0 ? "Jugador 1" : "Bot 2");
+const ev = (e: Partial<TrucoEvent> & Pick<TrucoEvent, "seat" | "kind">): TrucoEvent => ({ card: null, value: null, a: null, b: null, ...e });
+
+describe("truco cards", () => {
+  it("decodes suit and number and builds an accessible label", () => {
+    expect(decodeCard(0)).toMatchObject({ suit: 0, number: 1, label: "1 de espadas" });
+    expect(decodeCard(16)).toMatchObject({ suit: 1, number: 7, label: "7 de bastos" });
+    expect(decodeCard(27).label).toBe("10 de oros");
+    expect(decodeCard(39).label).toBe("12 de copas");
+    expect(() => decodeCard(40)).toThrow(RangeError);
+  });
+
+  it("ranks the cards like the server and sorts the best first", () => {
+    const ace = 0, aceBastos = 10, sevenSwords = 6, sevenGold = 26, three = 2, two = 21, fakeAce = 30, four = 3, sevenCups = 36;
+    expect([aceBastos, four, ace, sevenCups, three, fakeAce, two, sevenGold, sevenSwords].sort(byStrength)).toEqual([ace, aceBastos, sevenSwords, sevenGold, three, two, fakeAce, sevenCups, four]);
+    expect(strengthOf(ace)).toBe(14);
+    expect(strengthOf(four)).toBe(1);
+  });
+});
+
+describe("truco event texts", () => {
+  it("tells calls, answers and plays", () => {
+    expect(eventText(ev({ seat: 1, kind: "truco", value: 2 }), nameOf)).toBe("Bot 2 cantó truco");
+    expect(eventText(ev({ seat: 0, kind: "vale4", value: 4 }), nameOf)).toBe("Jugador 1 cantó vale cuatro");
+    expect(eventText(ev({ seat: 0, kind: "falta_envido" }), nameOf)).toBe("Jugador 1 cantó falta envido");
+    expect(eventText(ev({ seat: 1, kind: "no_quiero" }), nameOf)).toBe("Bot 2 no quiso");
+    expect(eventText(ev({ seat: 0, kind: "quiero" }), nameOf)).toBe("Jugador 1 quiso");
+    expect(eventText(ev({ seat: 0, kind: "mazo" }), nameOf)).toBe("Jugador 1 se fue al mazo");
+    expect(eventText(ev({ seat: 0, kind: "play", card: 0 }), nameOf)).toBe("Jugador 1 jugó 1 de espadas");
+    expect(eventText(ev({ seat: 0, kind: "start" }), nameOf)).toBe("Empezó la ronda");
+  });
+
+  it("tells bazas, envido results and the end of a hand", () => {
+    expect(eventText(ev({ seat: 0, kind: "baza" }), nameOf)).toBe("Ganó la baza Jugador 1");
+    expect(eventText(ev({ seat: -1, kind: "parda" }), nameOf)).toBe("Parda");
+    expect(eventText(ev({ seat: 0, kind: "envido_result", value: 2, a: 33, b: 27 }), nameOf)).toBe("Envido: Jugador 1 tenía 33 y Bot 2 27 — ganó Jugador 1 (+2)");
+    expect(eventText(ev({ seat: 1, kind: "hand_end", value: 2 }), nameOf)).toBe("Ronda para Bot 2: +2");
+  });
+});
+
+describe("truco actions", () => {
+  it("labels each move in Spanish and turns raises into answers when a truco is pending", () => {
+    expect(actionLabel("envido", null)).toBe("Envido");
+    expect(actionLabel("real_envido", null)).toBe("Real envido");
+    expect(actionLabel("falta_envido", null)).toBe("Falta envido");
+    expect(actionLabel("truco", null)).toBe("Truco");
+    expect(actionLabel("retruco", null)).toBe("Retruco");
+    expect(actionLabel("vale4", null)).toBe("Vale cuatro");
+    expect(actionLabel("quiero", null)).toBe("Quiero");
+    expect(actionLabel("no_quiero", null)).toBe("No quiero");
+    expect(actionLabel("mazo", null)).toBe("Al mazo");
+    const truco = { kind: "truco" as const, caller: 1, level: 1, calls: [] };
+    expect(actionLabel("retruco", truco)).toBe("Quiero retruco");
+    expect(actionLabel("vale4", { ...truco, level: 2 })).toBe("Quiero vale cuatro");
+    expect(actionLabel("envido", truco)).toBe("Envido");
+    expect(actionLabel("real_envido", { kind: "envido", caller: 1, level: 0, calls: ["envido"] })).toBe("Subir: real envido");
+  });
+
+  it("groups the moves and words the pending call", () => {
+    expect(groupOf("real_envido")).toBe("envido");
+    expect(groupOf("vale4")).toBe("truco");
+    expect(groupOf("no_quiero")).toBe("response");
+    expect(groupOf("mazo")).toBe("mazo");
+    expect(pendingText({ kind: "truco", caller: 1, level: 1, calls: [] }, nameOf)).toBe("Bot 2 cantó truco: ¿quiero?");
+    expect(pendingText({ kind: "envido", caller: 0, level: 0, calls: ["envido", "real_envido"] }, nameOf)).toBe("Jugador 1 cantó envido, real envido: ¿quiero?");
+    expect(playBody(7)).toEqual({ type: "play", card: 7 });
+    expect([0, 1, 2, 3].map(trucoWorth)).toEqual([1, 2, 3, 4]);
+  });
+});
