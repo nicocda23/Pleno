@@ -43,6 +43,11 @@ Un juego de ronda compartida (Crash) usa lo mismo y suma dos piezas de la plataf
 **plazo propio para la reserva** de la Wallet (`ReserveStake.TtlSeconds`) cuando la ronda dura mas que el plazo por defecto. Su motor de rondas es un servicio en segundo
 plano registrado por el propio modulo. Ver `docs/juego-crash.md`.
 
+## Juegos de mesa (ejemplo: Blackjack)
+Un juego de mesas (Blackjack) es el mismo contrato con varias partidas simultaneas: cada mesa tiene su mano compartida, turnos y cartas ocultas, y el modulo trae un
+motor con un ciclo por mesa. Cada apuesta (cada asiento) sigue el protocolo de rondas con la Wallet por su cuenta. El aviso en vivo (`GameBroadcast`) solo dice "la mesa
+cambio": el navegador vuelve a pedir el estado, que arma el servidor sin la carta tapada. Ver `docs/juego-blackjack.md` y el ADR 0010.
+
 ## Un juego en su propio proceso
 El servicio de juegos es un solo programa que carga los modulos habilitados. Si un juego necesita su propio proceso (por ejemplo uno en vivo
 y compartido), se levanta el mismo programa con `Games:Enabled` = ese juego y se enruta por el gateway. Cada despliegue tiene su `gamesdb`.

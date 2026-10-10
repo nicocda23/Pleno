@@ -397,3 +397,23 @@ a { color: inherit; }
 .crash-proof dt { color: var(--muted); }
 .crash-proof dd { margin: 0; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .crash-multiplier { text-shadow: none; } }
+
+/* ---- Blackjack ---- */
+.bj-rules { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.bj-table-card { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.bj-felt { display: grid; gap: 18px; padding: 16px; border-radius: var(--radius); border: 2px solid var(--gold); background: radial-gradient(ellipse at top, #1f6b45, #0f3d28); color: #f4efe2; }
+.bj-who { margin: 0 0 6px; font-weight: 800; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.bj-hand { display: flex; flex-wrap: wrap; gap: 6px; min-height: 64px; align-items: center; }
+.bj-card { display: inline-grid; place-items: center; align-content: center; width: 44px; height: 62px; border-radius: 6px; background: #fffdf6; color: #111; border: 1px solid #0006; font-weight: 800; line-height: 1.1; box-shadow: 0 2px 6px rgb(0 0 0 / 0.4); }
+.bj-card--red { color: #c0262d; }
+.bj-card--back { background: repeating-linear-gradient(45deg, #7a1f2b, #7a1f2b 5px, #5a1520 5px, #5a1520 10px); border: 2px solid #fffdf6; }
+.bj-seats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.bj-seat { padding: 10px; border-radius: 12px; background: rgb(0 0 0 / 0.25); border: 2px solid transparent; }
+.bj-seat--mine { border-color: var(--gold); }
+.bj-seat--active { box-shadow: 0 0 0 3px var(--win); }
+.bj-seat--lost { opacity: 0.75; }
+.bj-total { margin: 6px 0 0; font-variant-numeric: tabular-nums; }
+.bj-result { margin: 2px 0 0; font-weight: 700; }
+.bj-seat .win { color: #8ff0bf; }
+.bj-seat .muted { color: #d6ceb8; }
+.bj-actions { display: flex; flex-wrap: wrap; gap: 12px; }
