@@ -242,7 +242,7 @@ public sealed partial class CrashService(
         {
             session.Insert(bet);
             await using var outboxSession = outbox.Enroll(session);
-            await outboxSession.PublishAsync(new ReserveStake(betId, accountId, stake, ReservationSecondsFor(round, now)));
+            await outboxSession.PublishAsync(new ReserveStake(betId, accountId, stake, ReservationSecondsFor(round, now), "crash"));
             await session.SaveChangesAsync(ct);
         }
         catch (Exception ex) when (ex is DocumentAlreadyExistsException || ex.InnerException is DocumentAlreadyExistsException)

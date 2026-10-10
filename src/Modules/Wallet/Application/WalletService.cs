@@ -73,12 +73,14 @@ public sealed partial class WalletService(
     public Task<OperationOutcome> CreditAsync(Guid accountId, string key, long amount, CancellationToken ct = default) =>
         ExecuteAsync(accountId, a => a.Credit(key, amount, clock.GetUtcNow()), ct);
 
-    public Task<OperationOutcome> ReserveAsync(Guid accountId, string key, Guid reservationId, long stake, CancellationToken ct = default) =>
-        ExecuteAsync(accountId, a => a.Reserve(key, reservationId, stake, clock.GetUtcNow()), ct);
+    /// <param name="gameId">Juego donde se aposto; solo informativo (se muestra en el extracto).</param>
+    public Task<OperationOutcome> ReserveAsync(Guid accountId, string key, Guid reservationId, long stake, string? gameId = null, CancellationToken ct = default) =>
+        ExecuteAsync(accountId, a => a.Reserve(key, reservationId, stake, clock.GetUtcNow(), gameId), ct);
 
     /// <param name="ttl">Cuanto puede quedar abierta esta reserva antes de liberarse sola (un juego de ronda larga pide mas que el plazo por defecto).</param>
-    public Task<OperationOutcome> ReserveAsync(Guid accountId, string key, Guid reservationId, long stake, TimeSpan ttl, CancellationToken ct = default) =>
-        ExecuteAsync(accountId, a => a.Reserve(key, reservationId, stake, clock.GetUtcNow()), ct, ttl);
+    /// <param name="gameId">Juego donde se aposto; solo informativo (se muestra en el extracto).</param>
+    public Task<OperationOutcome> ReserveAsync(Guid accountId, string key, Guid reservationId, long stake, TimeSpan ttl, string? gameId = null, CancellationToken ct = default) =>
+        ExecuteAsync(accountId, a => a.Reserve(key, reservationId, stake, clock.GetUtcNow(), gameId), ct, ttl);
 
     public Task<OperationOutcome> SettleAsync(Guid accountId, string key, Guid reservationId, long payout, CancellationToken ct = default) =>
         ExecuteAsync(accountId, a => a.Settle(key, reservationId, payout, clock.GetUtcNow()), ct);

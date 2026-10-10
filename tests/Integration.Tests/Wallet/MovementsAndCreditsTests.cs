@@ -80,6 +80,26 @@ public sealed class MovementsAndCreditsTests : IDisposable
     }
 
     [Fact]
+    public async Task A_stake_its_prize_and_its_refund_carry_the_game_where_it_was_bet()
+    {
+        var (_, accountId) = await PlayerAsync();
+        var won = Guid.NewGuid();
+        var cancelled = Guid.NewGuid();
+        await Wallet.CreditAsync(accountId, "welcome-bonus", 1_000);
+        await Wallet.ReserveAsync(accountId, "r1", won, 100, gameId: "roulette");
+        await Wallet.SettleAsync(accountId, "s1", won, 250);
+        await Wallet.ReserveAsync(accountId, "r2", cancelled, 50, gameId: "slots");
+        await Wallet.ReleaseAsync(accountId, "x2", cancelled);
+        await Wallet.ReserveAsync(accountId, "r3", Guid.NewGuid(), 10); // sin juego (apuesta anterior a que se guardara)
+
+        var page = await Wallet.GetMovementsAsync(accountId, 50, before: null);
+
+        Assert.Equal(
+            [(MovementKind.Stake, (string?)null), (MovementKind.Refund, "slots"), (MovementKind.Stake, "slots"), (MovementKind.Prize, "roulette"), (MovementKind.Stake, "roulette"), (MovementKind.WelcomeBonus, null)],
+            page.Items.Select(m => (m.Kind, m.GameId)));
+    }
+
+    [Fact]
     public async Task The_statement_is_paged_with_a_cursor_that_never_repeats_or_skips()
     {
         var (_, accountId) = await PlayerAsync();

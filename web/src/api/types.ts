@@ -27,6 +27,8 @@ export interface Movement {
   delta: number;
   balanceAfter: number;
   reference: string | null;
+  /** Juego de la apuesta, el premio o la devolucion; null si no aplica (cargas) o es anterior a que se guardara. */
+  gameId?: string | null;
 }
 
 export interface MovementsPage {

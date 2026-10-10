@@ -61,7 +61,7 @@ public sealed partial class SlotsService(
                     PlacedAt = now,
                 });
 
-                await outboxSession.PublishAsync(new ReserveStake(betId, accountId, stake));
+                await outboxSession.PublishAsync(new ReserveStake(betId, accountId, stake, GameId: "slots"));
             },
             ct);
 

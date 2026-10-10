@@ -10,7 +10,7 @@ namespace Casino.Contracts;
 /// Un juego pide reservar las fichas de una apuesta. <paramref name="TtlSeconds"/> es cuanto puede quedar abierta la reserva antes de liberarse
 /// sola: la mayoria de los juegos resuelve en segundos y usa el plazo por defecto de la Wallet; uno de ronda larga (Crash) pide un plazo mayor.
 /// </summary>
-public sealed record ReserveStake(Guid BetId, Guid AccountId, long Stake, int? TtlSeconds = null);
+public sealed record ReserveStake(Guid BetId, Guid AccountId, long Stake, int? TtlSeconds = null, string? GameId = null);
 
 /// <summary>
 /// Un juego en vivo difunde un hecho a TODOS los jugadores conectados (por ejemplo, "se abrio la ronda" o "exploto el cohete").

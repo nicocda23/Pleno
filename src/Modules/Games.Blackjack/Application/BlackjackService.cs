@@ -394,7 +394,7 @@ public sealed partial class BlackjackService(
 
             session.Insert(bet);
             await using var outboxSession = outbox.Enroll(session);
-            await outboxSession.PublishAsync(new ReserveStake(betId, accountId, stake, ReservationSecondsFor(round, now)));
+            await outboxSession.PublishAsync(new ReserveStake(betId, accountId, stake, ReservationSecondsFor(round, now), "blackjack"));
             await BroadcastAsync(outboxSession, round, now);
             await session.SaveChangesAsync(ct);
         }

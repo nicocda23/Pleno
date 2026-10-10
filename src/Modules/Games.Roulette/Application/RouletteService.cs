@@ -100,7 +100,7 @@ public sealed partial class RouletteService(
                     PlacedAt = now,
                 });
 
-                await outboxSession.PublishAsync(new ReserveStake(betId, request.AccountId, total));
+                await outboxSession.PublishAsync(new ReserveStake(betId, request.AccountId, total, GameId: "roulette"));
             },
             ct);
 

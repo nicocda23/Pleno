@@ -124,7 +124,7 @@ public sealed partial class TableService(
         session.Insert(table);
         session.Insert(bet);
         await using var outboxSession = outbox.Enroll(session);
-        await outboxSession.PublishAsync(new ReserveStake(bet.Id, accountId, buyIn, options.ReservationSeconds));
+        await outboxSession.PublishAsync(new ReserveStake(bet.Id, accountId, buyIn, options.ReservationSeconds, gameId));
         await BroadcastAsync(outboxSession, table, now);
         await session.SaveChangesAsync(ct);
         return new TableCreated(tableId, table.JoinCode, AlreadyCreated: false);
@@ -162,7 +162,7 @@ public sealed partial class TableService(
             session.Store(table);
             session.Insert(bet);
             await using var outboxSession = outbox.Enroll(session);
-            await outboxSession.PublishAsync(new ReserveStake(bet.Id, accountId, table.BuyIn, options.ReservationSeconds));
+            await outboxSession.PublishAsync(new ReserveStake(bet.Id, accountId, table.BuyIn, options.ReservationSeconds, table.GameId));
             await BroadcastAsync(outboxSession, table, now);
             await session.SaveChangesAsync(ct);
         });
