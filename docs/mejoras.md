@@ -23,7 +23,7 @@ Formato: `- [ ]` pendiente · `- [x]` hecho. Agregar la fecha o el PR al cerrar 
 - [ ] _(anotar)_
 
 ### Crash
-- [ ] **CRÍTICO: a veces no aparece la opción de retirar (detener) tras iniciar la apuesta.** El jugador pierde las fichas sin poder cobrar. Causa desconocida. Mínimo: no debe iniciarse/debitarse la apuesta si el cliente no puede retirar (por ejemplo, confirmar que el tiempo real está conectado y el botón de retiro habilitado antes de aceptar la apuesta). Investigar también por qué falta el botón (¿estado de ronda, reconexión, mensaje perdido?) y evaluar retiro automático o reembolso si la ronda arrancó sin poder retirar.
+- [x] **CRÍTICO: a veces no aparece la opción de retirar (detener) tras iniciar la apuesta.** El jugador pierde las fichas sin poder cobrar. Causa desconocida. Mínimo: no debe iniciarse/debitarse la apuesta si el cliente no puede retirar (por ejemplo, confirmar que el tiempo real está conectado y el botón de retiro habilitado antes de aceptar la apuesta). Investigar también por qué falta el botón (¿estado de ronda, reconexión, mensaje perdido?) y evaluar retiro automático o reembolso si la ronda arrancó sin poder retirar. _(PR #52: botón de retiro siempre visible con apuesta en juego, consulta cada 250 ms, no se apuesta sin tiempo real. Causa raíz no confirmada: reabrir si vuelve a pasar.)_
 
 ### Ruleta
 - [ ] _(anotar)_
@@ -45,6 +45,7 @@ Navegación, responsive, accesibilidad, mensajes, sonidos.
 - [x] **Extraer el módulo de "cuántas fichas" del tragamonedas a un componente compartido.** Separarlo de `Slots.tsx` en un componente reutilizable y usarlo en todos los juegos donde aplique (ruleta, blackjack, crash, etc.), para unificar la UX y evitar duplicación. La selección rápida de fichas (los botones de montos) no debe ocupar más de una fila (sin saltos de línea, también en móvil).
 - [x] **Login: el ícono se deformó.** En la página de login la "P" del logo quedó más grande que el círculo de fondo. Revisar el tamaño/escala del SVG o la fuente del logo y que la P quede contenida y centrada dentro del círculo.
 - [x] **Mejorar la interfaz de creación de mesas (Poker, Truco, Uno y las que apliquen).** A simple vista no se entiende qué hay que hacer: falta guiar el flujo (crear mesa → sumar bots/invitar → iniciar), explicar cada campo (entrada, jugadores, privada/código) y dejar clara la acción principal.
+- [x] **Lobby de mesas: los botones quedan lejos.** En el lobby para armar mesas (Crear mesa, y en la sala de espera Agregar/Quitar bot y Empezar) los botones siguen lejos del pulgar/de la vista. Fijarlos abajo (pinned) como en los juegos, con la clase `dock`.
 
 ## Tiempo real
 Mesas, reconexión, latencia.

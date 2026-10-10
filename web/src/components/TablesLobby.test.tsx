@@ -241,6 +241,16 @@ describe("TablesLobby: la sala de espera", () => {
     expect(screen.getByText(/Faltan 1 jugador para empezar \(mínimo 2\)/)).toBeInTheDocument();
   });
 
+  it("pins the main buttons at the bottom (dock) in the create form and in the room", async () => {
+    const { unmount } = renderLobby(apiWith({ list: [], table: view() }));
+    expect((await screen.findByRole("button", { name: "Crear mesa" })).closest(".dock")).not.toBeNull();
+    unmount();
+
+    renderLobby(apiWith(room()));
+    expect((await screen.findByRole("button", { name: "Empezar" })).closest(".dock")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Agregar bot" }).closest(".dock")).not.toBeNull();
+  });
+
   it("shows the room as step 2 while the table is not ready to start", async () => {
     renderLobby(apiWith(room()));
 
