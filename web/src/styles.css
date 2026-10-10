@@ -718,3 +718,37 @@ button.tru-card--playable:hover { transform: translateY(-14px); }
   .tru-table { padding: 6px; gap: 4px; }
 }
 
+
+/* Tragamonedas: tema Gemas */
+.reel .glyph { line-height: 1; }
+.reel__cell .gem { width: 72%; height: auto; max-height: 86%; filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.45)); }
+.reels--gemas { background: radial-gradient(ellipse at 50% 0%, #4b2a8f, #1b0f3d 70%); border-color: #c9a7ff; box-shadow: inset 0 0 28px rgb(0 0 0 / 0.65), 0 0 22px rgb(150 100 255 / 0.35); }
+.reels--gemas .reel { background: radial-gradient(ellipse at 50% 35%, #3a2377, #120a2c 80%); border-color: #6a4bb8; color: #fff; }
+.gem--top { filter: drop-shadow(0 0 6px rgb(180 230 255 / 0.9)); }
+.gem__glint { transform-box: fill-box; transform-origin: center; animation: gem-glint 2.6s ease-in-out infinite; }
+.reel:nth-child(2) .gem__glint { animation-delay: 0.9s; }
+.reel:nth-child(3) .gem__glint { animation-delay: 1.7s; }
+@keyframes gem-glint { 0%, 70%, 100% { opacity: 0; transform: scale(0.2) rotate(0deg); } 82% { opacity: 1; transform: scale(1.1) rotate(45deg); } }
+.paytable__reels { display: inline-flex; gap: 4px; align-items: center; }
+.paytable__reels .gem, .spin-list__reels .gem { width: 1.7rem; height: 1.7rem; }
+.spin-list__reels { display: inline-flex; gap: 2px; align-items: center; }
+
+/* Casi-premio: el ultimo rodillo frena con suspenso */
+.reel--tense { animation: reel-tense 0.28s ease-in-out infinite; box-shadow: 0 0 0 3px #ffd34d, 0 0 26px 6px rgb(255 211 77 / 0.75), inset 0 6px 10px rgb(0 0 0 / 0.18); z-index: 1; }
+.reels--tense { animation: reels-glow 0.6s ease-in-out infinite alternate; }
+@keyframes reel-tense { 0%, 100% { transform: scale(1) rotate(0deg); } 25% { transform: scale(1.06) rotate(-1.2deg); } 75% { transform: scale(1.06) rotate(1.2deg); } }
+@keyframes reels-glow { from { border-color: var(--gold); } to { border-color: #fff2a8; } }
+
+/* Premio: los rodillos ganadores laten y la maquina se sacude segun el tamaño */
+.reel--win { animation: reel-win 0.7s ease-in-out 3; box-shadow: 0 0 0 3px #ffd34d, 0 0 22px 4px rgb(255 211 77 / 0.7); }
+@keyframes reel-win { 50% { transform: scale(1.1); } }
+.reels--big { animation: machine-shake 0.5s ease-in-out 2; }
+.reels--mega { animation: machine-shake 0.4s ease-in-out 6, mega-flash 0.5s ease-in-out 4; }
+@keyframes machine-shake { 0%, 100% { transform: translate(0); } 20% { transform: translate(-4px, 2px); } 40% { transform: translate(4px, -2px); } 60% { transform: translate(-3px, -2px); } 80% { transform: translate(3px, 2px); } }
+@keyframes mega-flash { 50% { box-shadow: inset 0 0 28px rgb(255 255 255 / 0.5), 0 0 50px 10px rgb(255 211 77 / 0.85); } }
+.win-modal--big .win-modal__title, .win-modal--mega .win-modal__title { font-size: 2.3rem; letter-spacing: 0.04em; animation: win-pulse 0.8s ease-in-out infinite; }
+.win-modal--mega .win-modal__box { border-color: #fff2a8; box-shadow: 0 20px 60px rgb(0 0 0 / 0.5), 0 0 90px rgb(255 211 77 / 0.7); }
+.win-modal--mega .win-modal__title { background: linear-gradient(90deg, #ffd34d, #fff, #ffd34d); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; }
+@media (prefers-reduced-motion: reduce) {
+  .gem__glint, .reel--tense, .reels--tense, .reel--win, .reels--big, .reels--mega, .win-modal--big .win-modal__title, .win-modal--mega .win-modal__title { animation: none; }
+}

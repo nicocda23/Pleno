@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { usePaytable, usePlaceSpin, useSpin, useSpins } from "../api/hooks";
 import type { Paytable, Spin } from "../api/types";
 import { Confetti } from "../components/Confetti";
+import { SlotSymbol } from "../components/SlotSymbol";
 import { useToasts } from "../components/Toasts";
 import { formatChips } from "../lib/format";
 import { errorMessage, failureMessage } from "../lib/messages";
 import { ReelsModel } from "../lib/reels";
-import { glyphOf, labelOf } from "../lib/slots";
+import { WIN_TITLES, labelOf, winTier, winningReels, type WinTier } from "../lib/slots";
+import { SLOT_THEMES, themedLabel, useSlotTheme, type SlotThemeId } from "../lib/slotThemes";
 import { useWheelClock } from "../lib/useWheelClock";
 import { playWinSound } from "../lib/winSound";
 import { useRealtime } from "../realtime/RealtimeProvider";
@@ -14,6 +16,7 @@ import { useRealtime } from "../realtime/RealtimeProvider";
 const CHIPS = [10, 50, 100, 500];
 const AUTO_COUNTS = [10, 25, 50, 100];
 const AUTO_PAUSE_MS = 700;
+const CONFETTI: Record<WinTier, number> = { win: 40, big: 90, mega: 180 };
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -33,6 +36,8 @@ function Machine({ paytable }: { paytable: Paytable }) {
   const placeSpin = usePlaceSpin();
   const recent = useSpins(30);
   const names = paytable.symbols.map((s) => s.name);
+  const [theme, setTheme] = useSlotTheme();
+  const nameOf = (symbol: string) => themedLabel(theme, symbol, labelOf(symbol));
 
   const [model] = useState(() => new ReelsModel(names.length, paytable.reels, { reduceMotion: prefersReducedMotion() }));
   const defaultStake = Math.min(10, paytable.maxStake);
@@ -81,10 +86,10 @@ function Machine({ paytable }: { paytable: Paytable }) {
       if (payout > spin.stake && autoRef.current > 0) {
         // En automatico no se interrumpe con el popup: un aviso y sigue.
         toasts.show("info", `Ganaste ${formatChips(payout - spin.stake)} fichas.`);
-        playWinSound();
+        playWinSound(winTier(spin.multiplier));
       } else if (payout > spin.stake) {
         setWinPopup(spin);
-        playWinSound();
+        playWinSound(winTier(spin.multiplier));
       } else if (autoRef.current > 0) {
         // En automatico solo se avisa cuando se gana.
       } else if (payout === spin.stake) toasts.show("info", "Recuperaste tus fichas.");
@@ -202,7 +207,7 @@ function Machine({ paytable }: { paytable: Paytable }) {
     return () => clearTimeout(timer);
   }, [auto, spinning, placeSpin.isPending, canSpin, result, stakeValid, stake, balance.available, toasts]);
 
-  const label = phase === "settled" && result ? `Salió ${result.reels.map(labelOf).join(", ")}` : phase === "idle" ? "Rodillos quietos" : "Los rodillos están girando";
+  const label = phase === "settled" && result ? `Salió ${result.reels.map(nameOf).join(", ")}` : phase === "idle" ? "Rodillos quietos" : "Los rodillos están girando";
 
   return (
     <div className="stack">
@@ -215,7 +220,14 @@ function Machine({ paytable }: { paytable: Paytable }) {
       <div className="table-grid">
         <section className="card" aria-labelledby="maquina">
           <h2 id="maquina" className="section-title">La máquina</h2>
-          <ReelsView model={model} names={names} phase={phase} label={label} />
+          <div className="chips" role="radiogroup" aria-label="Estilo de la máquina">
+            {SLOT_THEMES.map((t) => (
+              <button key={t.id} type="button" role="radio" aria-checked={theme === t.id} className={`choice ${theme === t.id ? "choice--on" : ""}`} onClick={() => setTheme(t.id)}>
+                {t.name}
+              </button>
+            ))}
+          </div>
+          <ReelsView model={model} names={names} phase={phase} label={label} theme={theme} win={!spinning && result?.status === "Settled" && (result.payout ?? 0) > result.stake ? result : null} />
 
           <h3 className="section-subtitle">Cuántas fichas</h3>
           <div className="chips chips--stake" role="radiogroup" aria-label="Fichas a apostar">
@@ -278,14 +290,16 @@ function Machine({ paytable }: { paytable: Paytable }) {
           <ul className="paytable" aria-label="Premios">
             {[...paytable.symbols].sort((a, b) => b.triplePayout - a.triplePayout).map((symbol) => (
               <li key={symbol.name}>
-                <span className="paytable__reels" aria-hidden="true">{`${glyphOf(symbol.name)} ${glyphOf(symbol.name)} ${glyphOf(symbol.name)}`}</span>
-                <span className="sr-only">Tres {labelOf(symbol.name)}</span>
+                <span className="paytable__reels" aria-hidden="true">
+                  {[0, 1, 2].map((k) => <SlotSymbol key={k} theme={theme} name={symbol.name} />)}
+                </span>
+                <span className="sr-only">Tres {nameOf(symbol.name)}</span>
                 <strong>x{formatChips(symbol.triplePayout)}</strong>
               </li>
             ))}
             {[...paytable.leadingPays].sort((a, b) => b.count - a.count).map((pay) => (
               <li key={`${pay.symbol}-${pay.count}`}>
-                <span>{pay.count === 1 ? `${labelOf(pay.symbol)} en el primer rodillo` : `${pay.count} ${labelOf(pay.symbol)} seguidas desde la izquierda`}</span>
+                <span>{pay.count === 1 ? `${nameOf(pay.symbol)} en el primer rodillo` : `${pay.count} ${nameOf(pay.symbol)} seguidas desde la izquierda`}</span>
                 <strong>x{formatChips(pay.payout)}</strong>
               </li>
             ))}
@@ -298,8 +312,8 @@ function Machine({ paytable }: { paytable: Paytable }) {
           <ul className="spin-list" aria-label="Últimos giros">
             {recent.data?.filter((s) => s.status === "Settled").slice(0, 30).map((s) => (
               <li key={s.betId}>
-                <span aria-hidden="true">{s.reels.map(glyphOf).join(" ")}</span>
-                <span className="sr-only">{s.reels.map(labelOf).join(", ")}</span>
+                <span className="spin-list__reels" aria-hidden="true">{s.reels.map((name, i) => <SlotSymbol key={i} theme={theme} name={name} />)}</span>
+                <span className="sr-only">{s.reels.map(nameOf).join(", ")}</span>
                 <span className={(s.payout ?? 0) > s.stake ? "win" : "muted"}>{(s.payout ?? 0) > 0 ? `+${formatChips(s.payout ?? 0)}` : "—"}</span>
               </li>
             ))}
@@ -309,16 +323,17 @@ function Machine({ paytable }: { paytable: Paytable }) {
       </div>
 
       {winPopup && (
-        <div className="win-modal" role="dialog" aria-modal="true" aria-labelledby="win-title" onClick={() => setWinPopup(null)}>
-          <Confetti />
+        <div className={`win-modal win-modal--${winTier(winPopup.multiplier)}`} role="dialog" aria-modal="true" aria-labelledby="win-title" onClick={() => setWinPopup(null)}>
+          <Confetti pieces={CONFETTI[winTier(winPopup.multiplier)]} />
           <div className="win-modal__box" onClick={(e) => e.stopPropagation()}>
-            <div className="reels reels--static" aria-hidden="true">
+            <div className={`reels reels--static reels--${theme}`} aria-hidden="true">
               {winPopup.reels.map((name, i) => (
-                <span key={i} className="reel">{glyphOf(name)}</span>
+                <span key={i} className="reel reel--win"><span className="reel__cell"><SlotSymbol theme={theme} name={name} /></span></span>
               ))}
             </div>
-            <h2 id="win-title" className="win-modal__title">¡Ganaste!</h2>
-            <p className="win-modal__amount">{formatChips((winPopup.payout ?? 0) - winPopup.stake)} fichas</p>
+            <h2 id="win-title" className="win-modal__title">{WIN_TITLES[winTier(winPopup.multiplier)]}</h2>
+            <p className="sr-only">{formatChips((winPopup.payout ?? 0) - winPopup.stake)} fichas</p>
+            <p className="win-modal__amount" aria-hidden="true"><CountUp to={(winPopup.payout ?? 0) - winPopup.stake} /> <span>fichas</span></p>
             <p className="muted">Apostaste {formatChips(winPopup.stake)} y cobraste {formatChips(winPopup.payout ?? 0)} (x{winPopup.multiplier}).</p>
             <button type="button" className="btn btn--gold" autoFocus onClick={() => setWinPopup(null)}>
               Continuar
@@ -331,32 +346,37 @@ function Machine({ paytable }: { paytable: Paytable }) {
 }
 
 /** Dibuja lo que muestra el modelo: el modelo cambia solo, asi que se lo mira en cada cuadro y se re-renderiza solo si algo cambio. */
-function ReelsView({ model, names, phase, label }: { model: ReelsModel; names: string[]; phase: string; label: string }) {
+function ReelsView({ model, names, phase, label, theme, win }: { model: ReelsModel; names: string[]; phase: string; label: string; theme: SlotThemeId; win: Spin | null }) {
   const [shown, setShown] = useState(() => [...model.display]);
   const [stopped, setStopped] = useState(() => [...model.stopped]);
+  const [tense, setTense] = useState(false);
 
   useEffect(() => {
     let frame = 0;
     const tick = () => {
       setShown((current) => (current.every((v, i) => v === model.display[i]) ? current : [...model.display]));
       setStopped((current) => (current.every((v, i) => v === model.stopped[i]) ? current : [...model.stopped]));
+      setTense(model.anticipating);
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [model]);
 
+  const winning = win ? winningReels(win.reels) : null;
+  const tier = win ? winTier(win.multiplier) : null;
+
   return (
-    <div className="reels" role="img" aria-label={label} data-testid="reels" data-state={phase}>
+    <div className={`reels reels--${theme} ${tense ? "reels--tense" : ""} ${tier ? `reels--${tier}` : ""}`} role="img" aria-label={label} data-testid="reels" data-state={phase}>
       {shown.map((symbol, i) => (
-        <span key={i} className={`reel ${stopped[i] ? "" : "reel--spinning"}`} data-testid={`reel-${i}`} data-symbol={names[symbol]}>
+        <span key={i} className={`reel ${stopped[i] ? "" : "reel--spinning"} ${!stopped[i] && tense && i === shown.length - 1 ? "reel--tense" : ""} ${winning?.[i] ? "reel--win" : ""}`} data-testid={`reel-${i}`} data-symbol={names[symbol]}>
           {stopped[i] ? (
-            <span className="reel__cell reel__cell--landed">{glyphOf(names[symbol] ?? "")}</span>
+            <span className="reel__cell reel__cell--landed"><SlotSymbol theme={theme} name={names[symbol] ?? ""} /></span>
           ) : (
             // Cinta vertical con los simbolos repetidos: al desplazarla la mitad se ve continua. Cada rodillo, a su velocidad.
             <span className="reel__strip" aria-hidden="true" style={{ animationDuration: `${(names.length * (0.07 + (i % 2) * 0.035)).toFixed(3)}s`, animationDelay: `${-i * 0.11}s` }}>
               {[...names, ...names].map((name, k) => (
-                <span key={k} className="reel__cell">{glyphOf(name)}</span>
+                <span key={k} className="reel__cell"><SlotSymbol theme={theme} name={name} /></span>
               ))}
             </span>
           )}
@@ -364,6 +384,24 @@ function ReelsView({ model, names, phase, label }: { model: ReelsModel; names: s
       ))}
     </div>
   );
+}
+
+/** Cuenta de 0 al monto ganado, para que la ganancia "suba" en vez de aparecer de golpe. Con menos movimiento, aparece directa. */
+function CountUp({ to }: { to: number }) {
+  const [value, setValue] = useState(() => (prefersReducedMotion() ? to : 0));
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / 1_400);
+      setValue(Math.round(to * (1 - Math.pow(1 - progress, 3))));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [to]);
+  return <>{formatChips(value)}</>;
 }
 
 function SpinResult({ spin }: { spin: Spin }) {
