@@ -753,6 +753,57 @@ button.tru-card--playable:hover { transform: translateY(-14px); }
   .gem__glint, .reel--tense, .reels--tense, .reel--win, .reels--big, .reels--mega, .win-modal--big .win-modal__title, .win-modal--mega .win-modal__title { animation: none; }
 }
 
+/* ---- Escritorio: las mismas medidas que en celular (barra fina, boton principal pegado abajo, mesas compactas) para no scrollear al jugar ---- */
+@media (min-width: 641px) {
+  .topbar { padding: 6px 16px; gap: 14px; flex-wrap: nowrap; }
+  .brand__name { font-size: 1.3rem; }
+  .brand__chip { width: 30px; height: 30px; }
+  .topbar__nav a { padding: 6px 12px; }
+  .topbar .balance { flex-direction: row; align-items: baseline; gap: 8px; padding: 4px 12px; }
+  .topbar .balance__value { font-size: 1.1rem; }
+  .icon-btn { width: 34px; height: 34px; }
+
+  .content { padding: 14px 16px 24px; }
+  .stack { gap: 14px; }
+  .card { padding: 16px; }
+  .stack > header .display { font-size: 1.7rem; }
+  .stack > header > .muted { font-size: 0.9rem; }
+  /* En partida desaparece el titulo de la pagina: lo que importa es la mesa y tus botones. */
+  .stack:has(.uno-felt, .tru-table, .pk-players, .bj-felt) > header { display: none; }
+  .uno-head .muted, .tru-head .muted, .pk-head .muted { display: none; }
+  .uno-head .section-title, .tru-head .section-title, .pk-head .section-title { font-size: 1.05rem; margin-bottom: 6px; }
+
+  /* Barra de accion pegada abajo: apostar, girar, jugar carta siempre a la vista. */
+  .dock {
+    position: sticky; bottom: 0; z-index: 15;
+    margin: 12px -16px -16px; padding: 10px 16px;
+    background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(8px);
+    border-top: 1px solid var(--line); box-shadow: 0 -8px 18px rgb(0 0 0 / 0.14);
+  }
+  .dock .btn--block { margin-top: 0; }
+  .uno-mine.dock, .tru-mine.dock, .pk-dock.dock {
+    background: color-mix(in srgb, #0f3d28 96%, transparent); color: #f4efe2; border-top: 2px solid var(--gold);
+    box-shadow: 0 -10px 20px rgb(0 0 0 / 0.35); margin: 8px 0 0; border-radius: var(--radius) var(--radius) 0 0; gap: 6px;
+  }
+  .uno-hand, .tru-hand { flex-wrap: nowrap; overflow-x: auto; min-height: 0; padding: 10px 2px 6px; scrollbar-width: thin; }
+  .uno-hand > *, .tru-hand > * { flex: none; }
+  .pk-hand { min-height: 0; gap: 8px; }
+  .uno-mine .bj-who, .tru-mine .bj-who, .pk-dock .pk-mine .bj-who { display: none; }
+  .uno-mine .uno-card--lg { width: 62px; height: 92px; font-size: 1.6rem; }
+  .tru-mine .tru-card { width: 56px; height: 84px; }
+  .tru-calls__title { display: none; }
+  .pk-dock .pk-card--lg { width: 56px; height: 80px; font-size: 1.3rem; }
+  .pk-dock.dock { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 14px; }
+  .pk-dock .pk-actions { display: contents; }
+  .pk-dock .pk-actions__main { grid-column: 2; }
+  .pk-dock .pk-raise { grid-column: 1 / -1; }
+  .pk-dock .pk-raise legend { display: none; }
+
+  .hero { padding: 16px 20px; }
+  .crash-history { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+  .crash-history > * { flex: none; }
+}
+
 /* Ruleta: modal con la rueda, visible solo mientras gira y un rato despues de que cae la bola */
 .wheel-modal { position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 16px; background: rgb(0 0 0 / 0.72); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.25s ease-out, visibility 0s linear 0.25s; }
 .wheel-modal--open { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.25s ease-out; }

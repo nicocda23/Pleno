@@ -22,6 +22,7 @@ Laboratorio de arquitectura distribuida en .NET. Ver `README.md` y `docs/PLAN.md
 - PII (email, nombre, documento) enmascarada en logs y fuera de trazas/metricas. Datos de prueba solo con Bogus.
 - Tests obligatorios para todo lo que toque la Wallet (unitarios + integracion con Testcontainers).
 - Cada fase cierra con un ADR en `docs/adr/`.
+- Si digo "agregar a mejoras", anotarlo en `docs/mejoras.md` y ubicarlo en la seccion que corresponda (juego, Entorno, Billetera, Usuarios, Front / UX, Tiempo real, Rendimiento, Otros), reemplazando el `_(anotar)_` si es el primer item. Formato `- [ ] **Titulo.** detalle`.
 - Si hago una pregunta con opciones y el usuario no contesta en 2 minutos, elegir siempre la opcion marcada como Recomendada y seguir (y avisar despues cual se eligio).
 
 ## Estructura
