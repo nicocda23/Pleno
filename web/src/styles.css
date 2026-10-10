@@ -150,6 +150,7 @@ a { color: inherit; }
 .landing__points { list-style: none; padding: 0; margin: 4px 0 8px; display: grid; gap: 8px; text-align: left; }
 .landing__points li::before { content: "♦ "; color: var(--gold); }
 .landing__fine { font-size: 0.78rem; color: var(--muted); }
+.landing__error { font-size: 0.9rem; color: var(--loss); font-weight: 600; margin: 0.75rem 0 0; }
 .splash { color: var(--muted); }
 
 /* ---------- Games ---------- */
