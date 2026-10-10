@@ -165,16 +165,22 @@ export interface PileSpot {
   rot: number;
 }
 
-/** Cada mano cae un poco corrida (hacia abajo y a la derecha) de la anterior, asi la que se juega encima deja ver las de abajo. */
-const MANO_BASE = [{ x: -42, y: -20 }, { x: 2, y: 4 }, { x: 46, y: 28 }] as const;
+/** Cada mano arranca un poco MAS ARRIBA que la anterior (misma columna), asi se lee el apilado de las tres manos. */
+const MANO_START = [{ x: -16, y: 22 }, { x: -16, y: 4 }, { x: -16, y: -14 }] as const;
+/** La segunda carta de la mano cae al costado y un poco abajo de la primera. */
+const SECOND_CARD = { x: 32, y: 18 } as const;
 const JITTER = [-7, 5, -3, 8, 4, -6] as const;
 
 /**
- * Donde cae la carta numero `index` (0 = la primera de la ronda) de la pila de la mesa. Las dos cartas de una mano van encimadas (la tuya mas abajo, la del rival mas arriba)
- * y un poco "tiradas" (giradas distinto), como en una mesa de verdad; la segunda mano se juega ENCIMA de la primera, y la tercera de la segunda.
+ * Donde cae la carta numero `index` (0 = la primera de la ronda) de la pila de la mesa. Las cartas se apilan de a dos por mano: la primera en el punto de partida
+ * de la mano y la segunda al costado y un poco abajo; la mano siguiente arranca un poco mas arriba (y su segunda carta otra vez abajo a la derecha), asi se ven las 3 manos.
  */
-export function pileSpot(index: number, mine: boolean): PileSpot {
-  const base = MANO_BASE[Math.min(Math.floor(index / 2), MANO_BASE.length - 1)]!;
-  const side = mine ? 1 : -1;
-  return { dx: base.x + side * 16, dy: base.y + side * 28, rot: JITTER[index % JITTER.length]! + side * 2 };
+export function pileSpot(index: number): PileSpot {
+  const start = MANO_START[Math.min(Math.floor(index / 2), MANO_START.length - 1)]!;
+  const second = index % 2 === 1;
+  return {
+    dx: start.x + (second ? SECOND_CARD.x : 0),
+    dy: start.y + (second ? SECOND_CARD.y : 0),
+    rot: JITTER[index % JITTER.length]!,
+  };
 }

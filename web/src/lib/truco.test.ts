@@ -76,28 +76,26 @@ describe("la pila de cartas de la mesa", () => {
     expect(MANO_NAMES).toEqual(["Primera mano", "Segunda mano", "Tercera mano"]);
   });
 
-  it("puts my card below and the rival's above, and moves each mano a bit further so the one played on top still shows the ones below", () => {
+  it("stacks the cards two by two: the second one of a mano falls to the right and a bit lower, and every new mano starts higher than the previous one", () => {
     for (const mano of [0, 1, 2]) {
-      const rival = pileSpot(mano * 2, false);
-      const mine = pileSpot(mano * 2 + 1, true);
+      const first = pileSpot(mano * 2);
+      const second = pileSpot(mano * 2 + 1);
 
-      expect(mine.dy).toBeGreaterThan(rival.dy);
+      expect(second.dx).toBeGreaterThan(first.dx);
+      expect(second.dy).toBeGreaterThan(first.dy);
+      expect(second.dx - first.dx).toBeLessThan(66); // sigue encimada: la carta mide 66 px
     }
 
-    const firstMano = pileSpot(0, true);
-    const secondMano = pileSpot(2, true);
-    const thirdMano = pileSpot(4, true);
-
-    expect(secondMano.dx - firstMano.dx).toBeGreaterThan(20); // la segunda cae corrida de la primera: se ven asomar las de abajo
-    expect(thirdMano.dy).toBeGreaterThan(secondMano.dy);
-    expect(Math.abs(secondMano.dx - firstMano.dx)).toBeLessThan(66); // pero se juega ENCIMA: sigue tapando buena parte de la anterior (la carta mide 66 px)
+    expect(pileSpot(2).dy).toBeLessThan(pileSpot(0).dy); // la 3ra arranca mas arriba que la 1ra
+    expect(pileSpot(4).dy).toBeLessThan(pileSpot(2).dy); // y la 5ta vuelve a subir
+    expect(pileSpot(3).dy).toBeLessThan(pileSpot(1).dy); // la 4ta cae abajo a la derecha de la 3ra, pero mas arriba que la 2da
   });
 
   it("throws the cards a little crooked, differently each one, and is deterministic", () => {
-    const rotations = [0, 1, 2, 3, 4, 5].map((i) => pileSpot(i, i % 2 === 1).rot);
+    const rotations = [0, 1, 2, 3, 4, 5].map((i) => pileSpot(i).rot);
 
     expect(new Set(rotations).size).toBeGreaterThan(3);
     expect(rotations.every((r) => Math.abs(r) <= 12)).toBe(true);
-    expect(pileSpot(3, true)).toEqual(pileSpot(3, true));
+    expect(pileSpot(3)).toEqual(pileSpot(3));
   });
 });
