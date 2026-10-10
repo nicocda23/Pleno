@@ -38,6 +38,18 @@ var keycloak = builder.AddContainer("keycloak", "quay.io/keycloak/keycloak", "26
     .WithBindMount("./realms", "/opt/keycloak/data/import", isReadOnly: true)
     // El volumen va en /opt/keycloak/data (que existe en la imagen con el dueño correcto), no en una subcarpeta que Docker crearia como root.
     .WithVolume("keycloak-data", "/opt/keycloak/data");
+// Iniciar sesion con Google (opcional). Las credenciales de la app OAuth de Google son secretos: solo user-secrets en local y Key Vault en la nube,
+// nunca en el realm versionado. Sin ellas el boton de Google no aparece y todo sigue igual. Ver docs/autenticacion.md.
+//   dotnet user-secrets set "Parameters:google-client-id" <valor> --project src/Casino.AppHost
+//   dotnet user-secrets set "Parameters:google-client-secret" <valor> --project src/Casino.AppHost
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Parameters:google-client-id"]) && !string.IsNullOrWhiteSpace(builder.Configuration["Parameters:google-client-secret"]))
+{
+    keycloak
+        .WithEnvironment("GOOGLE_ENABLED", "true")
+        .WithEnvironment("GOOGLE_CLIENT_ID", builder.AddParameter("google-client-id", secret: true))
+        .WithEnvironment("GOOGLE_CLIENT_SECRET", builder.AddParameter("google-client-secret", secret: true));
+}
+
 if (lanMode)
 {
     // El emisor de los tokens es la URL publica (la del proxy del front). Las URLs "backchannel" (jwks, token...) se arman con el host
