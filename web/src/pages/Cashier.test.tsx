@@ -10,7 +10,7 @@ const PLAYER_ID = "0a1b2c3d-0001-4000-8000-000000000001";
 const account = { accountId: "a1", userId: ME_ID, available: 1_000, reserved: 0, version: 2, openReservations: {} };
 
 const me = (roles: string[]): Me => ({ userId: ME_ID, displayName: "caja", roles, accountId: "a", registeredAt: "2026-10-01T10:00:00Z" });
-const place = (level: string) => ({ userId: ME_ID, level, parentUserId: null });
+const place = (level: string, commissionPermille = 20) => ({ userId: ME_ID, level, parentUserId: null, commissionPermille });
 const members = [
   { userId: PLAYER_ID, level: "player", displayName: "ana", available: 50, reserved: 0 },
   { userId: "0a1b2c3d-0002-4000-8000-000000000002", level: "player", displayName: null, available: null, reserved: null },
@@ -45,7 +45,7 @@ describe("Cashier", () => {
       "GET /cashier/me": () => place("cashier"),
       "GET /cashier/members": () => members,
       "GET /cashier/transfers": () => [],
-      "POST /cashier/transfers": () => ({ transactionId: "t1", isDuplicate: false }),
+      "POST /cashier/transfers": () => ({ transactionId: "t1", isDuplicate: false, commission: 3 }),
     });
     renderApp(<Cashier />, { api });
 
@@ -59,7 +59,24 @@ describe("Cashier", () => {
     const call = api.calls.find((c) => c.method === "POST" && c.path === "/cashier/transfers")!;
     expect(call.body).toEqual({ toUserId: PLAYER_ID, amount: 150 });
     expect(call.headers?.["Idempotency-Key"]).toMatch(/^[0-9a-f-]{36}$/);
-    expect(await screen.findByText("Cargaste 150 fichas.")).toBeInTheDocument();
+    expect(await screen.findByText("Cargaste 150 fichas. Ganaste 3 de comisión.")).toBeInTheDocument();
+  });
+
+  it("tells the cashier what commission they earn, and says nothing when the rate is zero", async () => {
+    const routes = (permille: number) => ({
+      "GET /me": () => me(["player", "cashier"]),
+      "GET /wallet/me": () => account,
+      "GET /cashier/me": () => place("cashier", permille),
+      "GET /cashier/members": () => members,
+      "GET /cashier/transfers": () => [],
+    });
+    const { unmount } = renderApp(<Cashier />, { api: fakeApi(routes(20)) });
+    expect(await screen.findByText(/comisión del 2 %/)).toBeInTheDocument();
+    unmount();
+
+    renderApp(<Cashier />, { api: fakeApi(routes(0)) });
+    await screen.findByText(/Tus jugadores/);
+    expect(screen.queryByText(/comisión del/)).not.toBeInTheDocument();
   });
 
   it("tells people apart by user name (with the short id next to it) and falls back to the short id when the name is not known yet", async () => {

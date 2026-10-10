@@ -1,6 +1,6 @@
 # ADR 0014 - Cajeros: jerarquia, cargas por transferencia, comision y cobros
 
-- **Estado:** aceptada (fase A implementada; fases B y C pendientes)
+- **Estado:** aceptada (fases A y B implementadas; fase C pendiente)
 - **Fecha:** 2026-10-10
 
 ## Contexto
@@ -20,8 +20,11 @@ fichas lleva `IdempotencyKey`, la identidad sale del token y la PII no va a logs
   escribe **un evento `ChipsTransferred` en cada stream, con los mismos asientos y el mismo id de transaccion, en una sola transaccion** (cada cuenta solo proyecta su mitad). La clave de idempotencia del que envia
   es la que manda el cliente; la mitad de entrada usa una derivada (hash) para no chocar con otras operaciones de la cuenta que recibe. Una transferencia **no se revierte** (la otra mitad vive en otra cuenta): se compensa
   con otra en sentido contrario. Las compuertas por cuenta se toman siempre en el mismo orden para que dos transferencias cruzadas no se bloqueen.
-- **Incentivo: comision del cajero.** El cajero se queda con un **porcentaje de lo que carga**, en fichas, con tope por carga y por dia. Los jugadores no reciben bonus por una carga. La
-  comision es otra transferencia (de la casa o del propio monto, a definir en la fase B) y queda auditada como movimiento aparte.
+- **Incentivo: comision del cajero.** El cajero se queda con un **porcentaje de lo que carga**, en fichas, con tope por carga y por dia. Los jugadores no reciben bonus por una carga.
+  **Fase B, decidido: la paga la casa** (acredita fichas nuevas a quien cargo, como una carga normal de backoffice), **2 % para el cajero** y 0 % para el jefe por defecto (configurables en `Cashiers`), con tope de 1.000
+  por carga y 10.000 por dia UTC. El jugador recibe el monto completo; la comision es un movimiento aparte ("Comision por cargas"). **La decision se guarda antes de pagar** (`CommissionRecord`, una por carga): un reintento
+  paga exactamente lo mismo y nunca dos veces, aunque entre medio haya cambiado el tope diario. La casa emite fichas, pero acotadas: el backoffice ve el total emitido. Es una carga con tope diario "blando" entre
+  instancias (dentro de una instancia se serializa por persona).
 - **Cobro (extraccion): el camino inverso, con el protocolo que ya existe.** El jugador pide retirar: sus fichas se **reservan** (mismo protocolo reservar → resolver → liquidar de los juegos). Su
   cajero (o backoffice) **aprueba y paga**; al liquidar se debitan las fichas del jugador y se **transfieren al cajero**, que cierra el ciclo. Si no se aprueba o vence, la reserva se **libera** y las
   fichas vuelven al jugador. La doble aprobacion para montos altos sigue siendo de la fase 5.

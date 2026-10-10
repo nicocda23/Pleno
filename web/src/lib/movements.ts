@@ -9,6 +9,7 @@ const LABELS: Record<MovementKind, string> = {
   Reversal: "Operación revertida",
   TransferIn: "Fichas recibidas",
   TransferOut: "Fichas enviadas",
+  Commission: "Comisión por cargas",
 };
 
 /** Texto del concepto de un movimiento. Si el servidor agrega un tipo nuevo, se muestra tal cual. */

@@ -45,6 +45,7 @@ export function Cashier() {
   const isHead = me.data?.roles.includes(HEAD_CASHIER_ROLE) ?? false;
   const level = isHead ? HEAD_CASHIER_ROLE : CASHIER_ROLE;
   const targetsName = isHead ? "cajeros" : "jugadores";
+  const commissionPercent = (place.data.commissionPermille ?? 0) / 10;
   const value = Number(amount);
   const validAmount = Number.isInteger(value) && value > 0 && value <= MAX_LOAD;
   const enough = !balance.ready || value <= balance.available;
@@ -56,8 +57,8 @@ export function Cashier() {
     load.mutate(
       { toUserId: selected, amount: value, idempotencyKey: attemptKey },
       {
-        onSuccess: () => {
-          toasts.show("win", `Cargaste ${formatChips(value)} fichas.`);
+        onSuccess: (result) => {
+          toasts.show("win", `Cargaste ${formatChips(value)} fichas.${result.commission > 0 ? ` Ganaste ${formatChips(result.commission)} de comisión.` : ""}`);
           setAmount("");
           setAttemptKey(crypto.randomUUID());
         },
@@ -74,6 +75,7 @@ export function Cashier() {
         <p className="muted">
           Las fichas salen de <strong>tu saldo</strong> ({balance.ready ? `${formatChips(balance.available)} fichas` : "…"}): se mueven, no se crean. Podés cargarle a tus {targetsName}; si te quedás sin fichas,
           pedile al {isHead ? "administrador" : "jefe de cajeros"}.
+          {commissionPercent > 0 && <> Por cada carga cobrás una <strong>comisión del {commissionPercent} %</strong> que paga la casa (con tope por carga y por día).</>}
         </p>
       </section>
 

@@ -17,7 +17,7 @@ export interface AuditEntry {
 }
 
 /** Que paso con las fichas disponibles. */
-export type MovementKind = "WelcomeBonus" | "Credit" | "Stake" | "Prize" | "Refund" | "Reversal" | "TransferIn" | "TransferOut";
+export type MovementKind = "WelcomeBonus" | "Credit" | "Stake" | "Prize" | "Refund" | "Reversal" | "TransferIn" | "TransferOut" | "Commission";
 
 /** Nivel en la jerarquia de cargas (los mismos nombres que los roles). */
 export type HierarchyLevel = "player" | "cashier" | "head_cashier";
@@ -37,6 +37,15 @@ export interface CashierMe {
   userId: string;
   level: HierarchyLevel;
   parentUserId: string | null;
+  /** Lo que cobro por cada carga, en milesimas (20 = 2 %). Lo paga la casa. */
+  commissionPermille: number;
+}
+
+/** El resultado de una carga: la transaccion y la comision que cobro quien cargo (0 si no cobra o llego al tope). */
+export interface LoadChipsResult {
+  transactionId: string;
+  isDuplicate: boolean;
+  commission: number;
 }
 
 /** Alguien de mi jurisdiccion directa; el saldo es null si todavia no abrio su cuenta. */
