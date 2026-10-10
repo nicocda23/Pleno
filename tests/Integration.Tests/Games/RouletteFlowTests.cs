@@ -158,6 +158,30 @@ public sealed class RouletteFlowTests(PostgresFixture db, RabbitMqFixture rabbit
     }
 
     [Fact]
+    public async Task A_player_who_leaves_right_after_betting_still_gets_the_round_resolved_and_paid_by_the_backend()
+    {
+        using var app = StartApp();
+        var (userId, accountId) = await FundedPlayerAsync(app, 1_000);
+        var wallet = app.Services.GetRequiredService<WalletService>();
+
+        // Apuesta y se va (vuelve al lobby o cierra la pestana) sin esperar el resultado.
+        Guid betId;
+        using (var client = app.ClientFor(userId))
+        {
+            betId = (await PlacedAsync(await PlaceAsync(client, "Red", [], 100, "left-1"))).GetProperty("betId").GetGuid();
+        }
+
+        await WaitUntilAsync(async () => (await wallet.GetAsync(accountId)).Reserved == 0, "las fichas liquidadas sin que el jugador este conectado");
+
+        // Al volver, la ronda ya esta cerrada y el saldo refleja el premio (o la perdida).
+        using var back = app.ClientFor(userId);
+        await WaitForStatusAsync(back, betId, "Settled");
+        var payout = (await RoundAsync(back, betId)).GetProperty("payout").GetInt64();
+        var account = await wallet.GetAsync(accountId);
+        Assert.Equal((1_000 - 100 + payout, 0L), (account.Available, account.Reserved));
+    }
+
+    [Fact]
     public async Task Insufficient_funds_rejects_the_round_and_it_never_blocks_the_seed_rotation()
     {
         using var app = StartApp();

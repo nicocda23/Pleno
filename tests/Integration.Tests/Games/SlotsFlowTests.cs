@@ -115,6 +115,35 @@ public sealed class SlotsFlowTests(PostgresFixture db, RabbitMqFixture rabbit) :
     }
 
     [Fact]
+    public async Task A_player_who_leaves_right_after_spinning_still_gets_the_spin_resolved_and_paid_by_the_backend()
+    {
+        using var app = StartApp();
+        var (userId, accountId) = await FundedPlayerAsync(app, 1_000);
+        var wallet = app.Services.GetRequiredService<WalletService>();
+
+        // El jugador gira y se va (cierra la pestana, vuelve al lobby): el cliente deja de existir sin esperar el resultado.
+        Guid betId;
+        using (var client = app.ClientFor(userId))
+        {
+            betId = (await AcceptedAsync(await SpinAsync(client, 100, "left-1"))).GetProperty("betId").GetGuid();
+        }
+
+        // Las fichas se descontaron al apostar y el backend cierra solo: el saldo termina en 1.000 - 100 + premio, sin nada reservado.
+        var deadline = DateTime.UtcNow.AddSeconds(90);
+        while (DateTime.UtcNow < deadline && (await wallet.GetAsync(accountId)).Reserved != 0)
+        {
+            await Task.Delay(300);
+        }
+
+        // Cuando vuelve, la jugada ya esta resuelta y el premio (si hubo) esta en su saldo.
+        using var back = app.ClientFor(userId);
+        await WaitForStatusAsync(back, betId, "Settled");
+        var payout = (await SpinStateAsync(back, betId)).GetProperty("payout").GetInt64();
+        var account = await wallet.GetAsync(accountId);
+        Assert.Equal((1_000 - 100 + payout, 0L), (account.Available, account.Reserved));
+    }
+
+    [Fact]
     public async Task Insufficient_funds_reject_the_spin_and_nothing_is_taken()
     {
         using var app = StartApp();

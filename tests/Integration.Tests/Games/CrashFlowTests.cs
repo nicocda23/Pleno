@@ -231,6 +231,34 @@ public sealed class CrashFlowTests(PostgresFixture db, RabbitMqFixture rabbit) :
         Assert.Equal((1_000 - 200 + 150L, 0L), (account.Available, account.Reserved));
     }
 
+    [Fact]
+    public async Task A_player_who_leaves_mid_round_is_paid_by_the_automatic_cash_out_but_loses_the_bet_without_one()
+    {
+        using var cluster = Start();
+        var (userId, accountId) = await FundedAsync(cluster, 1_000);
+
+        var round = StartRound(cluster, 300, 320);
+        Guid withAuto, withoutAuto;
+        using (var client = cluster.ClientFor(userId))
+        {
+            await WaitForPhaseAsync(client, "Betting");
+            withAuto = await PlacedAsync(await PlaceAsync(client, 100, "left-auto", 1.50m));
+            withoutAuto = await PlacedAsync(await PlaceAsync(client, 100, "left-manual"));
+            await WaitForBetAsync(client, withoutAuto, b => b.GetProperty("inPlay").GetBoolean(), "las apuestas en juego");
+        } // se va al lobby con el cohete por despegar: nadie vuelve a consultar ni a retirar
+
+        await round;
+
+        // El backend resolvio solo: el retiro automatico cobro (x1,50 sobre 100) y la apuesta sin retiro se perdio, porque en Crash retirar es accion del jugador.
+        using var back = cluster.ClientFor(userId);
+        await WaitForBetAsync(back, withAuto, b => b.GetProperty("status").GetString() == "Settled", "el retiro automatico cobrado");
+        await WaitForBetAsync(back, withoutAuto, b => b.GetProperty("status").GetString() == "Settled", "la apuesta sin retiro cerrada");
+        Assert.Equal(150, (await BetAsync(back, withAuto)).GetProperty("payout").GetInt64());
+        Assert.Equal(0, (await BetAsync(back, withoutAuto)).GetProperty("payout").GetInt64());
+        var account = await cluster.Wallet.Services.GetRequiredService<WalletService>().GetAsync(accountId);
+        Assert.Equal((1_000 - 200 + 150L, 0L), (account.Available, account.Reserved));
+    }
+
     private static readonly int[] ManualPlayers = [8, 9];
 
     [Fact]
