@@ -417,3 +417,74 @@ a { color: inherit; }
 .bj-seat .win { color: #8ff0bf; }
 .bj-seat .muted { color: #d6ceb8; }
 .bj-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* Mesas entre jugadores (lobby generico, .tl-*) */
+.tl-tables { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 10px; }
+.tl-table { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); }
+.tl-table__name { margin: 0; font-weight: 800; }
+.tl-table__meta { margin: 2px 0 0; }
+.tl-code { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 8px; }
+.tl-code .field { flex: 1 1 220px; }
+.tl-form { display: grid; gap: 12px; max-width: 460px; }
+.tl-check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.tl-room { display: grid; gap: 12px; }
+.tl-invite { display: grid; gap: 8px; padding: 12px; border-radius: 12px; border: 1px dashed var(--gold); }
+.tl-invite p { margin: 0; }
+.tl-invite__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.tl-seats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.tl-seat { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); }
+.tl-seat--mine { border-color: var(--gold); }
+.tl-seat--free { border-style: dashed; opacity: 0.7; }
+.tl-seat__name { font-weight: 800; }
+.tl-seat__state { font-size: 0.85rem; color: var(--muted); }
+.tl-seat__state--ready { color: var(--win); font-weight: 700; }
+.tl-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* Uno (.uno-*) */
+.uno-rules { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.uno-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.uno-head .muted { margin: 0; }
+.uno-alert { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; font-weight: 800; background: color-mix(in srgb, var(--gold) 25%, transparent); border: 1px solid var(--gold); }
+.uno-felt { display: grid; gap: 18px; padding: 16px; border-radius: var(--radius); border: 2px solid var(--gold); background: radial-gradient(ellipse at top, #1f6b45, #0f3d28); color: #f4efe2; }
+.uno-felt .muted { color: #d6ceb8; }
+.uno-others { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.uno-opp { padding: 10px; border-radius: 12px; background: rgb(0 0 0 / 0.25); border: 2px solid transparent; }
+.uno-opp--active { box-shadow: 0 0 0 3px var(--win); }
+.uno-opp--winner { border-color: var(--gold); }
+.uno-opp__cards { margin: 0; display: flex; align-items: center; gap: 8px; }
+.uno-opp__back { display: inline-grid; place-items: center; width: 34px; height: 48px; border-radius: 6px; font-weight: 800; color: #fff; border: 2px solid #fffdf6; background: repeating-linear-gradient(45deg, #7a1f2b, #7a1f2b 5px, #5a1520 5px, #5a1520 10px); }
+.uno-opp__tag { margin: 4px 0 0; font-size: 0.8rem; font-weight: 700; color: #f2c230; }
+.uno-opp__tag--uno { color: #8ff0bf; }
+.uno-center { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 28px; }
+.uno-pile { display: grid; gap: 6px; justify-items: center; padding: 0; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+.uno-pile:disabled { cursor: default; opacity: 0.8; }
+.uno-pile:not(:disabled):hover .uno-pile__back { transform: translateY(-3px); }
+.uno-pile__back { display: grid; place-items: center; width: 84px; height: 120px; border-radius: 10px; font-weight: 900; letter-spacing: 0.08em; color: #fff; border: 3px solid #fffdf6; background: repeating-linear-gradient(45deg, #7a1f2b, #7a1f2b 8px, #5a1520 8px, #5a1520 16px); box-shadow: 0 3px 8px rgb(0 0 0 / 0.4); transition: transform 0.15s; }
+.uno-pile__count { font-size: 0.85rem; }
+.uno-top { display: grid; gap: 6px; justify-items: center; }
+.uno-top p { margin: 0; }
+.uno-color { display: flex; align-items: center; gap: 6px; }
+.uno-color__dot { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fffdf6; }
+.uno-mine { display: grid; gap: 10px; }
+.uno-hand { display: flex; flex-wrap: wrap; gap: 8px; min-height: 96px; align-items: center; }
+.uno-card { position: relative; display: inline-grid; place-items: center; flex: none; padding: 0; border-radius: 10px; border: 3px solid #fffdf6; font-weight: 900; color: var(--uno-fg, #fff); background: var(--uno-bg, linear-gradient(135deg, #d63a3a 25%, #f2c230 25% 50%, #2fa968 50% 75%, #2f6fd6 75%)); box-shadow: 0 2px 6px rgb(0 0 0 / 0.45); font-family: inherit; }
+.uno-card--md { width: 58px; height: 86px; font-size: 1.5rem; }
+.uno-card--lg { width: 84px; height: 124px; font-size: 2.1rem; }
+.uno-card--wild { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); }
+.uno-card__corner { position: absolute; top: 3px; left: 5px; font-size: 0.7rem; }
+.uno-card__symbol { line-height: 1; }
+button.uno-card { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s; }
+button.uno-card:disabled { cursor: default; }
+.uno-card--playable { transform: translateY(-8px); box-shadow: 0 0 0 3px var(--gold), 0 6px 14px rgb(0 0 0 / 0.5); }
+button.uno-card--playable:hover { transform: translateY(-14px); }
+.uno-card--dim { opacity: 0.45; }
+.uno-picker { display: grid; gap: 8px; padding: 12px; border-radius: 12px; background: rgb(0 0 0 / 0.3); }
+.uno-picker p { margin: 0; font-weight: 700; }
+.uno-picker__colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.uno-picker__color { min-width: 92px; padding: 10px 14px; border-radius: 10px; border: 3px solid #fffdf6; font: inherit; font-weight: 800; text-transform: capitalize; cursor: pointer; }
+.uno-result { display: grid; gap: 8px; margin-top: 14px; }
+.uno-result p { margin: 0; }
+.uno-events { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .uno-card, .uno-pile__back { transition: none; }
+}

@@ -98,7 +98,11 @@ export function RealtimeProvider({ children, connectionFactory = defaultConnecti
       void queryClient.invalidateQueries({ queryKey: queryKeys.spinsAll });
       void queryClient.invalidateQueries({ queryKey: queryKeys.movements });
     }) as (payload: never) => void);
-    hub.on("gameEvent", ((event: GameEvent) => gameListeners.current.forEach((listener) => listener(event))) as (payload: never) => void);
+    hub.on("gameEvent", ((event: GameEvent) => {
+      // Cualquier juego de mesas entre jugadores avisa que una mesa cambio (sin cartas): se refrescan su lista y sus mesas abiertas.
+      if (event.kind === "tableChanged") void queryClient.invalidateQueries({ queryKey: queryKeys.tablesOf(event.game) });
+      gameListeners.current.forEach((listener) => listener(event));
+    }) as (payload: never) => void);
     hub.onreconnecting(() => !disposed && setConnection("reconnecting"));
     hub.onreconnected(() => {
       if (disposed) return;

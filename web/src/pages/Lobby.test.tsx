@@ -60,6 +60,14 @@ describe("Lobby catalog", () => {
     expect(section().getAllByText("Blackjack")).toHaveLength(1);
   });
 
+  it("lists Uno with a link now that the front has its page", async () => {
+    const uno: GameInfo = { id: "uno", name: "Uno", tagline: "Mesas entre jugadores.", route: "/uno", glyph: "U", resolution: "Server" };
+    renderApp(<Lobby />, { api: apiWith(() => [roulette, slots, uno]) });
+
+    expect(await section().findByRole("link", { name: /Uno/ })).toHaveAttribute("href", "/uno");
+    expect(section().getAllByText("Uno")).toHaveLength(1);
+  });
+
   it("keeps the roadmap games as coming soon while they do not exist", async () => {
     renderApp(<Lobby />, { api: apiWith(() => [roulette, slots]) });
 
