@@ -213,7 +213,7 @@ a { color: inherit; }
 .field input { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit; max-width: 200px; }
 .summary { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); margin-top: 6px; }
 
-.result { min-height: 280px; }
+.result { min-height: 160px; }
 .outcome { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 10px 0; }
 .outcome__title { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; }
 .outcome--win .outcome__title { color: var(--win); }
@@ -752,3 +752,12 @@ button.tru-card--playable:hover { transform: translateY(-14px); }
 @media (prefers-reduced-motion: reduce) {
   .gem__glint, .reel--tense, .reels--tense, .reel--win, .reels--big, .reels--mega, .win-modal--big .win-modal__title, .win-modal--mega .win-modal__title { animation: none; }
 }
+
+/* Ruleta: modal con la rueda, visible solo mientras gira y un rato despues de que cae la bola */
+.wheel-modal { position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; padding: 16px; background: rgb(0 0 0 / 0.72); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.25s ease-out, visibility 0s linear 0.25s; }
+.wheel-modal--open { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.25s ease-out; }
+.wheel-modal__box { display: grid; gap: 8px; justify-items: center; width: min(92vw, 400px); padding: 18px; background: var(--surface); border: 2px solid var(--gold); border-radius: 16px; box-shadow: 0 20px 60px rgb(0 0 0 / 0.5), 0 0 40px color-mix(in srgb, var(--gold) 25%, transparent); }
+.wheel-modal__box .wheel { width: 100%; margin: 0; }
+.wheel-modal__result { display: grid; place-items: center; min-height: 72px; }
+.wheel-modal--open .wheel-modal__box { animation: win-pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1); }
+@media (prefers-reduced-motion: reduce) { .wheel-modal--open .wheel-modal__box { animation: none; } }
