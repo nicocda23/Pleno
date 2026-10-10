@@ -75,7 +75,7 @@ describe("multiplier", () => {
   });
 
   it("gets to a multiplier exactly at timeToReach", () => {
-    for (const m of [101, 150, 250, 1_000, 50_000]) {
+    for (const m of [101, 150, 250, 1_000, 5_000]) {
       const t = timeToReach(m, 0.07);
       expect(multiplierAt(t + 0.002, 0.07)).toBeGreaterThanOrEqual(m);
       expect(multiplierAt(t - 0.002, 0.07)).toBeLessThan(m);
@@ -91,15 +91,15 @@ describe("multiplier", () => {
 });
 
 describe("parseAutoCashOut", () => {
-  it("accepts a comma or a dot and from 1,01 to 1000", () => {
+  it("accepts a comma or a dot and from 1,01 to 100", () => {
     expect(parseAutoCashOut("2,5")).toBe(2.5);
     expect(parseAutoCashOut("2.5")).toBe(2.5);
     expect(parseAutoCashOut(" 1.01 ")).toBe(1.01);
-    expect(parseAutoCashOut("1000")).toBe(1000);
+    expect(parseAutoCashOut("100")).toBe(100);
   });
 
   it("refuses anything else", () => {
-    for (const bad of ["", "abc", "1", "1.00", "0.5", "1000.01", "1001", "2.555", "-3", "1e3"]) expect(parseAutoCashOut(bad)).toBeNull();
+    for (const bad of ["", "abc", "1", "1.00", "0.5", "100.01", "101", "1000", "2.555", "-3", "1e3"]) expect(parseAutoCashOut(bad)).toBeNull();
   });
 });
 

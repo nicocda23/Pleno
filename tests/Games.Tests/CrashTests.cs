@@ -87,7 +87,7 @@ public class CrashMathTests
         }
 
         Assert.InRange((double)instant / rounds, 0.025, 0.055); // ~ la ventaja (3 %) mas las explosiones entre x1,00 y x1,01
-        Assert.True(capped > 0 && capped < rounds / 500, "el tope de x1.000 se alcanza muy rara vez");
+        Assert.True(capped > 0 && capped < rounds / 50, "el tope de x100 se alcanza en ~1 de cada 100 rondas");
     }
 
     [Fact]
@@ -113,8 +113,8 @@ public class CrashMathTests
     [InlineData(150)]
     [InlineData(250)]
     [InlineData(1_000)]
-    [InlineData(50_000)]
-    [InlineData(100_000)]
+    [InlineData(5_000)]
+    [InlineData(10_000)]
     public void The_time_to_reach_a_multiplier_is_the_exact_moment_it_gets_there(long multiplier)
     {
         var moment = CrashMath.TimeToReach(multiplier).TotalSeconds;
@@ -136,7 +136,7 @@ public class CrashMathTests
     [InlineData(100, 250, 250)]
     [InlineData(7, 150, 10)] // 10,5 -> piso
     [InlineData(1, 199, 1)]
-    [InlineData(1, 100_000, 1_000)]
+    [InlineData(1, 10_000, 100)]
     public void The_payout_is_always_a_whole_number_of_chips_rounded_down(long stake, long multiplier, long expected)
     {
         Assert.Equal(expected, CrashMath.PayoutFor(stake, multiplier));

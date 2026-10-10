@@ -4,7 +4,7 @@ import type { CrashRound } from "../api/types";
 // la semilla revelada). Los multiplicadores son enteros en centesimas (250 = x2,50), igual que en el servidor.
 
 export const ONE_X = 100;
-export const MAX_MULTIPLIER = 100_000;
+export const MAX_MULTIPLIER = 10_000;
 
 /** El multiplicador (centesimas) a los `elapsedSeconds` de empezar a subir. Solo para DIBUJAR: el que cuenta para los pagos lo decide el servidor. */
 export function multiplierAt(elapsedSeconds: number, growthPerSecond: number): number {
@@ -23,12 +23,12 @@ const formatter = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, max
 /** 250 -> "2,50x" */
 export const formatMultiplier = (centi: number): string => `${formatter.format(centi / 100)}x`;
 
-/** Lo que escribe el jugador ("2,5" o "2.5") como decimal valido para el retiro automatico (1,01 a 1000), o null. */
+/** Lo que escribe el jugador ("2,5" o "2.5") como decimal valido para el retiro automatico (1,01 a 100), o null. */
 export function parseAutoCashOut(text: string): number | null {
   const normalized = text.trim().replace(",", ".");
   if (!/^\d{1,4}(\.\d{1,2})?$/.test(normalized)) return null;
   const value = Number(normalized);
-  return value > 1 && value <= 1000 ? value : null;
+  return value > 1 && value <= 100 ? value : null;
 }
 
 export async function sha256Hex(text: string): Promise<string> {
@@ -39,7 +39,7 @@ export async function sha256Hex(text: string): Promise<string> {
 /**
  * El punto de explosion de una ronda, recalculado desde la semilla revelada. Es el MISMO algoritmo que usa el servidor
  * (docs/juego-crash.md): HMAC-SHA256 con la semilla como clave y "crash:{id sin guiones}" como mensaje; se toman 52 bits (r) y el punto es
- * piso(100 * (1000 - ventaja) * 2^52 / (1000 * (2^52 - r))), entre x1,00 y x1.000. BigInt: ningun paso pierde precision.
+ * piso(100 * (1000 - ventaja) * 2^52 / (1000 * (2^52 - r))), entre x1,00 y x100. BigInt: ningun paso pierde precision.
  */
 export async function crashPointOf(serverSeed: string, roundId: string, edgePermille: number): Promise<number> {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(serverSeed), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);

@@ -88,7 +88,7 @@ describe("Crash", () => {
     await screen.findByText(/Apuestas abiertas/);
 
     await userEvent.type(screen.getByLabelText(/Retiro automático/), "1");
-    expect(await screen.findByText(/tiene que estar entre 1,01 y 1000/)).toBeInTheDocument();
+    expect(await screen.findByText(/tiene que estar entre 1,01 y 100/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Apostar/ })).toBeDisabled();
 
     await userEvent.clear(screen.getByLabelText(/Retiro automático/));

@@ -206,7 +206,7 @@ public sealed partial class CrashService(
 
         if (autoCashOut is { } auto && (auto <= CrashMath.OneX || auto > CrashMath.MaxMultiplier))
         {
-            throw new GamesDomainException(GamesError.InvalidBet, "El retiro automatico va de x1,01 a x1.000,00.");
+            throw new GamesDomainException(GamesError.InvalidBet, "El retiro automatico va de x1,01 a x100,00.");
         }
 
         var betId = BetIdFor(accountId, idempotencyKey);
