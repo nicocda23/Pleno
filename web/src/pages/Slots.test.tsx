@@ -27,6 +27,8 @@ const paytable: Paytable = {
   totalWeight: 64,
   returnToPlayerPercent: 96.14,
   hitRatePercent: 33.72,
+  cascadeMultipliers: [1, 2, 3, 5, 10],
+  cascadeMinPay: 2,
 };
 
 const spinState = (overrides: Partial<Spin> = {}): Spin => ({
@@ -64,6 +66,8 @@ function reduceMotion(reduce: boolean) {
 async function ready() {
   await waitFor(() => expect(screen.getByRole("button", { name: /Girar por/ })).toBeEnabled());
 }
+
+const apiWithspin = (spin: Partial<Spin>) => apiWith({ "GET /games/slots/spins/bet-1": () => spinState(spin) });
 
 const symbolsShown = () => [0, 1, 2].map((i) => screen.getByTestId(`reel-${i}`).getAttribute("data-symbol"));
 
@@ -307,6 +311,25 @@ describe("Slots animation", () => {
     expect(await screen.findByRole("dialog", { name: "¡MEGA PREMIO!" }, { timeout: 6_000 })).toBeInTheDocument();
     await waitFor(() => expect(symbolsShown()).toEqual(["Siete", "Siete", "Siete"])); // ReelsView copia el modelo en un requestAnimationFrame
   }, 12_000);
+
+  it("plays the cascades one by one before revealing the result, ending on the last combination", async () => {
+    const steps = [
+      { reels: ["Cereza", "Cereza", "Bar"], pay: 3, multiplier: 1 },
+      { reels: ["Limon", "Bar", "Bar"], pay: 0, multiplier: 2 },
+    ];
+    const api = apiWithspin({ reels: ["Cereza", "Cereza", "Bar"], steps, multiplier: 3, payout: 30 });
+    renderApp(<Slots />, { api });
+    await ready();
+    await userEvent.click(screen.getByRole("button", { name: /Girar por/ }));
+
+    // Mientras explota y cae lo nuevo aparece el multiplicador de la cascada y todavia no hay resultado.
+    expect(await screen.findByTestId("cascade-badge", {}, { timeout: 8_000 })).toHaveTextContent("x2");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(symbolsShown()).toEqual(["Limon", "Bar", "Bar"]));
+
+    expect(await screen.findByRole("dialog", { name: "¡Ganaste!" }, { timeout: 5_000 })).toHaveTextContent("1 cascada encadenadas");
+    expect(symbolsShown()).toEqual(["Limon", "Bar", "Bar"]); // se queda la combinacion final, no vuelve a la inicial
+  }, 20_000);
 });
 
 describe("Slots themes", () => {

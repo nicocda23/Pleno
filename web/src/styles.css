@@ -761,3 +761,19 @@ button.tru-card--playable:hover { transform: translateY(-14px); }
 .wheel-modal__result { display: grid; place-items: center; min-height: 72px; }
 .wheel-modal--open .wheel-modal__box { animation: win-pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1); }
 @media (prefers-reduced-motion: reduce) { .wheel-modal--open .wheel-modal__box { animation: none; } }
+
+/* Tragamonedas: cascadas */
+.reels { position: relative; }
+.reel--burst { animation: reel-burst 0.75s ease-in forwards; }
+.reel--drop .reel__cell { animation: reel-drop 0.55s cubic-bezier(0.3, 1.5, 0.5, 1); }
+@keyframes reel-burst {
+  0% { transform: scale(1); filter: brightness(1); }
+  25% { transform: scale(1.18); filter: brightness(2.2); box-shadow: 0 0 0 4px #ffd34d, 0 0 34px 10px rgb(255 211 77 / 0.9); }
+  100% { transform: scale(0.4) rotate(8deg); filter: brightness(3); opacity: 0.1; box-shadow: 0 0 40px 14px rgb(255 255 255 / 0.7); }
+}
+@keyframes reel-drop { from { transform: translateY(-130%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.cascade-badge { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); z-index: 3; padding: 2px 16px; border-radius: 999px; font-family: var(--font-display); font-size: 1.7rem; font-weight: 900; color: #231b00; background: linear-gradient(180deg, #fff2a8, #ffc933); border: 2px solid #fff; box-shadow: 0 4px 18px rgb(255 201 51 / 0.8); animation: cascade-badge-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes cascade-badge-pop { from { transform: translateX(-50%) scale(0.3); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+.win-modal__chain { margin: 0; font-weight: 800; color: #ffc933; }
+.spin-list__chain { font-size: 0.8rem; font-weight: 800; color: #ffc933; }
+@media (prefers-reduced-motion: reduce) { .reel--burst, .reel--drop .reel__cell, .cascade-badge { animation: none; } }

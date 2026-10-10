@@ -200,6 +200,13 @@ export interface CrashCashOut {
   payout: number;
 }
 
+/** Un paso de un giro: lo que mostraban los rodillos, cuanto paga esa combinacion y el multiplicador de la cascada (x1 el giro inicial). */
+export interface SlotsStep {
+  reels: string[];
+  pay: number;
+  multiplier: number;
+}
+
 /** Un giro de tragamonedas. */
 export interface Spin {
   betId: string;
@@ -207,6 +214,8 @@ export interface Spin {
   stake: number;
   /** Nombre del simbolo de cada rodillo (vacio hasta que se sortea). */
   reels: string[];
+  /** Giro inicial y cascadas, en orden. Vacio en giros anteriores a las cascadas (alcanza con `reels`). */
+  steps?: SlotsStep[];
   multiplier: number | null;
   payout: number | null;
   pairId: string;
@@ -237,6 +246,10 @@ export interface Paytable {
   totalWeight: number;
   returnToPlayerPercent: number;
   hitRatePercent: number;
+  /** Multiplicador de cada paso de la cascada (el primero es el giro inicial). */
+  cascadeMultipliers: number[];
+  /** Un premio encadena solo si paga al menos esto. */
+  cascadeMinPay: number;
 }
 
 /** Una tabla de pagos de la tragamonedas tal como la ve el administrador. */
